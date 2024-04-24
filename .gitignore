@@ -1,0 +1,7 @@
+# Output files
+build/bin/
+build/obj/
+
+# clangd
+compile_commands.json
+.cache
