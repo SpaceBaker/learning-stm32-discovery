@@ -13,8 +13,14 @@
 
 #------------- Target -------------
 TARGET = myApp
-MCU    = atmega328p
-F_CPU  = 8000000
+MCU    = STM32L475xx
+ARCH   = armv7e-m
+CPU	   = cortex-m4
+ABI    = hard
+FPU	   = vfpv4
+# HSE_VALUE  = 8000000 # External oscillator frequency in Hz
+# MSI_VALUE  = 8000000 # Internal oscillator frequency in Hz
+# HSI_VALUE  = 8000000 # Internal oscillator frequency in Hz
 
 #------------- Working directories -------------
 SRC_DIR	   = src
@@ -25,30 +31,56 @@ OBJ_DIR    = $(BUILD_DIR)/obj
 
 #------------- Toolchain -------------
 # Provide the full path if not found in your environment variables
-CC_DIR  = $(HOME)/tools/avr8-gnu-toolchain-linux_x86_64/bin
-CC		= $(CC_DIR)/avr-gcc
-LD		= $(CC_DIR)/avr-ld
-OBJCOPY = $(CC_DIR)/avr-objcopy
-OBJDUMP = $(CC_DIR)/avr-objdump
-SIZE	= $(CC_DIR)/avr-size
+CC_DIR  = $(HOME)/tools/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi/bin
+AS		= $(CC_DIR)/arm-none-eabi-as
+CC		= $(CC_DIR)/arm-none-eabi-gcc
+LD		= $(CC_DIR)/arm-none-eabi-ld
+OBJCOPY = $(CC_DIR)/arm-none-eabi-objcopy
+OBJDUMP = $(CC_DIR)/arm-none-eabi-objdump
+SIZE	= $(CC_DIR)/arm-none-eabi-size
 CPPCK	= $(HOME)/tools/cppcheck-2.13.0/build/bin/cppcheck
 # PROG	= $(HOME)/tools/avrdude/v7.1/avrdude
 
 # List source files here
 # Exemple : $(wildcard $(SRC_DIR)/bsp/driver/*.c) ...
 # Exemple : $(SRC_DIR)/bsp/driver/i2c.c $(SRC_DIR)/bsp/driver/spi.c) ...
-SRCS =	$(wildcard $(SRC_DIR)/*.c)
+SRCS =	$(wildcard $(SRC_DIR)/*.c) \
+		$(wildcard $(SRC_DIR)/bsp/*.c) \
+		$(wildcard $(SRC_DIR)/myApp/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/hts221/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/ism43362_m3g_l44/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/lis3mdl/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/lps22hb/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/lsm6dsl/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/m24sr/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/mp34dt01/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/mp34dt01mx25r6435f/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/spbtle_rf/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/spsgrf/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/stsafe_a100/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/stsafe_a100vl53l0x/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/vl53l0x/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/stm32l475xx/*.c) \
+		$(wildcard $(SRC_DIR)/drivers/stm32l475xx/*/*.c) \
 
 # List header file directories here
 # Exemple : $(SRC_DIR)/bsp/utils
-INCS =	$(SRC_DIR)
+INCS =	$(SRC_DIR) \
+		$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include \
+		$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include/m-profile \
+		$(SRC_DIR)/bsp \
+		$(SRC_DIR)/myApp \
+		$(SRC_DIR)/drivers \
+		$(SRC_DIR)/drivers/stm32l475xx \
+		$(SRC_DIR)/drivers/stm32l475xx/startup \
 
 # List library directories here
 # Exemple : TODO
-LIBS =
+# LIBS = 
 
 #------------- Defines -------------
-DEFS = -DF_CPU=$(F_CPU)UL
+DEFS = -D$(MCU)
 
 #------------- Optimization Level -------------
 OPT	= -Og
@@ -62,12 +94,11 @@ DEBUG = -g
 #------------- C Language ISO Standard -------------
 CSTD = -std=gnu11
 
-#------------- Verbose -------------
-# Comment the line to disable verbose output
-# VERB = -v
-
 #------------- cppcheck flags -------------
 CPPCK_FLAGS = --quiet --error-exitcode=1 --language=c --std=c11 --suppress=unusedFunction
+
+#------------- Linker Script -------------
+LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/startup/stm32l475xx.ld
 
 
 #---------------------------------------------------------------------------------
@@ -75,10 +106,11 @@ CPPCK_FLAGS = --quiet --error-exitcode=1 --language=c --std=c11 --suppress=unuse
 #---------------------------------------------------------------------------------
 
 #------------- C Compiler Flags -------------
-CFLAGS = $(VERB) -mmcu=$(MCU) $(OPT) $(DEBUG) $(WARNS) $(addprefix -I, $(INCS)) $(CSTD) $(DEFS)
+CFLAGS = -mcpu=$(CPU) -mfloat-abi=$(ABI) -mfpu=$(FPU) -mthumb -nostdlib $(OPT) $(DEBUG) $(WARNS) $(addprefix -I, $(INCS)) $(CSTD) $(DEFS)
 
 #------------- C Linker Flags -------------
-LDFLAGS = $(VERB) -mmcu=$(MCU) -Wl,-Map,$(BIN_DIR)/$(TARGET).map,--cref -N $(LIBS)
+#! Not done here !#
+LDFLAGS = --script=$(LD_SCRIPT) -Map=$(BIN_DIR)/$(TARGET).map --cref -nostdlib --fix-stm32l4xx-629360 #-L $(LIBS)
 
 #------------- Objects -------------
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
@@ -96,7 +128,7 @@ elf: $(BIN_DIR)/$(TARGET).elf
 $(BIN_DIR)/$(TARGET).elf: $(OBJS)
 	@echo Linking $<
 	@mkdir -p $(@D)
-	$(CC) $(LDFLAGS) $^ -o $@
+	$(LD) $(LDFLAGS) $^ -o $@
 	@echo Size of your elf file :
 	@$(SIZE) $@
 
@@ -132,11 +164,11 @@ $(BIN_DIR)/$(TARGET).srec: $(BIN_DIR)/$(TARGET).elf
 # .PHONY: flash read_fuses
 
 # flash: $(BIN_DIR)/$(TARGET).hex
-# 	$(PROG) $(VERB) -c usbasp -P usb -qq -p $(MCU) -b 115200 -U $@:w:$<:i
+# 	$(PROG) -c usbasp -P usb -qq -p $(MCU) -b 115200 -U $@:w:$<:i
 
 #Reaf fuses
 # read_fuses:
-# 	$(PROG) $(VERB) -c usbasp -P usb -qq -p $(MCU) -b 115200 -U lfuse:r:-:h -U hfuse:r:-:h -U efuse:r:-:h
+# 	$(PROG) -c usbasp -P usb -qq -p $(MCU) -b 115200 -U lfuse:r:-:h -U hfuse:r:-:h -U efuse:r:-:h
 
 #------------- Rules for cppcheck -------------
 .PHONY: cppcheck
