@@ -39,7 +39,10 @@ OBJCOPY = $(CC_DIR)/arm-none-eabi-objcopy
 OBJDUMP = $(CC_DIR)/arm-none-eabi-objdump
 SIZE	= $(CC_DIR)/arm-none-eabi-size
 CPPCK	= $(HOME)/tools/cppcheck-2.13.0/build/bin/cppcheck
-# PROG	= $(HOME)/tools/avrdude/v7.1/avrdude
+PROG	= openocd
+PROG_CONFIG_FLAGS = -f interface/stlink.cfg -f board/stm32l4discovery.cfg
+PROG_RUN_FLAGS 	  = verify reset exit
+
 
 # List source files here
 # Exemple : $(wildcard $(SRC_DIR)/bsp/driver/*.c) ...
@@ -164,14 +167,10 @@ $(BIN_DIR)/$(TARGET).srec: $(BIN_DIR)/$(TARGET).elf
 	$(OBJCOPY) -O srec $< $@
 
 #------------- Rules for avrdude (programmer) -------------
-# .PHONY: flash read_fuses
+.PHONY: flash
 
-# flash: $(BIN_DIR)/$(TARGET).hex
-# 	$(PROG) -c usbasp -P usb -qq -p $(MCU) -b 115200 -U $@:w:$<:i
-
-#Reaf fuses
-# read_fuses:
-# 	$(PROG) -c usbasp -P usb -qq -p $(MCU) -b 115200 -U lfuse:r:-:h -U hfuse:r:-:h -U efuse:r:-:h
+flash: $(BIN_DIR)/$(TARGET).elf
+	$(PROG) $(PROG_CONFIG_FLAGS) -c "program $< $(PROG_RUN_FLAGS)"
 
 #------------- Rules for cppcheck -------------
 .PHONY: cppcheck
