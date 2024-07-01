@@ -76,6 +76,7 @@ INCS =	$(SRC_DIR) \
 		$(SRC_DIR)/drivers \
 		$(SRC_DIR)/drivers/stm32l475xx \
 		$(SRC_DIR)/drivers/stm32l475xx/startup \
+		$(SRC_DIR)/drivers/stm32l475xx/clock \
 
 # List library directories here
 # Exemple : TODO
