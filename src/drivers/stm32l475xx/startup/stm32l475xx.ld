@@ -1,7 +1,7 @@
 /*
 ******************************************************************************
 **
-** @file        : srm32l475xx.ld
+** @file        : stm32l475xx.ld
 **
 ** @author      : Modified from STM32CubeIDE Auto-Generator by SpaceBaker
 **
