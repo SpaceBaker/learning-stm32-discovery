@@ -23,7 +23,8 @@
  * limitations under the License.
  */
 
-// #include "system_stm32l475xx.h"
+#include <stm32l4xx.h>
+#include <system_stm32l4xx.h>
 
 
 /*---------------------------------------------------------------------------
@@ -260,7 +261,7 @@ void Reset_Handler(void)
   extern int main(void);
   
   /* CMSIS System Initialization */
-  // SystemInit();                             
+  SystemInit();
 
   // Copy .data from FLASH to SRAM
   unsigned int data_size = (unsigned int)&_edata - (unsigned int)&_sdata;
@@ -280,6 +281,8 @@ void Reset_Handler(void)
   {
     bss[i] = 0;
   }
+
+  // __libc_init_array();
 
   // Go to main
   main();

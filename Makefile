@@ -63,12 +63,14 @@ SRCS =	$(wildcard $(SRC_DIR)/*.c) \
 		$(wildcard $(SRC_DIR)/drivers/vl53l0x/*.c) \
 		$(wildcard $(SRC_DIR)/drivers/stm32l475xx/*.c) \
 		$(wildcard $(SRC_DIR)/drivers/stm32l475xx/*/*.c) \
+		$(SRC_DIR)/externals/cmsis_device_l4/Source/Templates/system_stm32l4xx.c
 
 # List header file directories here
 # Exemple : $(SRC_DIR)/bsp/utils
 INCS =	$(SRC_DIR) \
 		$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include \
 		$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include/m-profile \
+		$(SRC_DIR)/externals/cmsis_device_l4/Include \
 		$(SRC_DIR)/bsp \
 		$(SRC_DIR)/myApp \
 		$(SRC_DIR)/drivers \
