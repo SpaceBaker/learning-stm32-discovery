@@ -67,6 +67,8 @@ SRCS =	$(wildcard $(SRC_DIR)/*.c) \
 		$(wildcard $(SRC_DIR)/drivers/stm32l475xx/*.c) \
 		$(wildcard $(SRC_DIR)/drivers/stm32l475xx/*/*.c) \
 		$(SRC_DIR)/externals/cmsis_device_l4/Source/Templates/system_stm32l4xx.c
+		
+# AS_SRCS = $(SRC_DIR)/externals/cmsis_device_l4/Source/Templates/gcc/startup_stm32l475xx.s
 
 # List header file directories here
 # Exemple : $(SRC_DIR)/bsp/utils
@@ -112,7 +114,12 @@ LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/startup/stm32l475xx.ld
 #---------------------------------------------------------------------------------
 
 #------------- C Compiler Flags -------------
-CFLAGS = -mcpu=$(CPU) -mfloat-abi=$(ABI) -mfpu=$(FPU) -mthumb -nostdlib $(OPT) $(DEBUG) $(WARNS) $(addprefix -I, $(INCS)) $(CSTD) $(DEFS)
+CFLAGS = 	-mcpu=$(CPU) -mfloat-abi=$(ABI) -mfpu=$(FPU) -mthumb $(OPT) -ffunction-sections \
+			-fdata-sections $(DEBUG) $(WARNS) $(addprefix -I, $(INCS)) $(CSTD) $(DEFS) -T$(LD_SCRIPT) \
+			-Wl,-Map=$(BIN_DIR)/$(TARGET).map -nostdlib #--specs=debug-nano.specs --specs=debug-nosys.specs 
+
+#------------- Assembler Flags --------------
+ASFLAGS =	-mcpu=$(CPU) -c -x assembler-with-cpp -mfloat-abi=$(ABI) -mfpu=$(FPU) -mthumb
 
 #------------- C Linker Flags -------------
 #! Not done here !#
@@ -120,6 +127,7 @@ LDFLAGS = --script=$(LD_SCRIPT) -Map=$(BIN_DIR)/$(TARGET).map --cref -nostdlib -
 
 #------------- Objects -------------
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+AS_OBJS = $(patsubst $(SRC_DIR)/%.s,$(OBJ_DIR)/%.o,$(AS_SRCS))
 
 
 #------------- Rules for building the elf file -------------
@@ -131,12 +139,22 @@ build: elf lst
 
 elf: $(BIN_DIR)/$(TARGET).elf
 
-$(BIN_DIR)/$(TARGET).elf: $(OBJS)
-	@echo Linking $<
+$(BIN_DIR)/$(TARGET).elf: $(AS_OBJS) $(OBJS)
+	@echo Compiling $<
 	@mkdir -p $(@D)
-	$(LD) $(LDFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) -o $@ $^
 	@echo Size of your elf file :
 	@$(SIZE) $@
+# @echo Linking $<
+# @mkdir -p $(@D)
+# $(LD) $(LDFLAGS) $^ -o $@
+# @echo Size of your elf file :
+# @$(SIZE) $@
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.s
+	@echo Compiling $<
+	@mkdir -p $(@D)
+	$(AS) $< -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo Compiling $<
