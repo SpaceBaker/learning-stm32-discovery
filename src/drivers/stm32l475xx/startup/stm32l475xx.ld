@@ -57,11 +57,15 @@
  * Note 2 : Location counter operator '.' gives the current location (addr) in VMA (virtual memory address)
 */
 
-/* Entry Point */
-ENTRY(Reset_Handler)
 
-/* Highest address of the user mode stack */
-_estack = ORIGIN(FLASH) + LENGTH(FLASH); /* end of "RAM" type memory */
+__STACK_SIZE = 0x00000400;
+__HEAP_SIZE  = 0x00000C00;
+
+/* ARMv8-M stack sealing:
+   to use ARMv8-M stack sealing set __STACKSEAL_SIZE to 8 otherwise keep 0
+ */
+__STACKSEAL_SIZE = 0;
+
 
 /* Memories definition */
 MEMORY
@@ -70,6 +74,13 @@ MEMORY
   SRAM2  (xrw) : ORIGIN = 0x10000000, LENGTH = 32K
   FLASH   (rx) : ORIGIN = 0x08000000, LENGTH = 1024K
 }
+
+/* Highest address of the user mode stack */
+_estack = ORIGIN(SRAM1) + LENGTH(SRAM1) - __STACK_SIZE - __STACKSEAL_SIZE;
+
+/* Entry Point */
+ENTRY(Reset_Handler)
+
 
 /* Sections */
 SECTIONS
@@ -122,4 +133,40 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* end of bss section global symbol */
   } >SRAM1
+
+  .heap (NOLOAD) :
+  {
+    . = ALIGN(4);
+    __end__ = .;
+    PROVIDE(end = .);
+    . = . + __HEAP_SIZE;
+    . = ALIGN(4);
+    __HeapLimit = .;
+  } > SRAM1
+
+  .stack (_estack) (NOLOAD) :
+  {
+    . = ALIGN(4);
+    __StackLimit = .;
+    . = . + __STACK_SIZE;
+    . = ALIGN(4);
+    __StackTop = .;
+  } > SRAM1
+  PROVIDE(__stack = __StackTop);
+
+    /* ARMv8-M stack sealing:
+     to use ARMv8-M stack sealing uncomment '.stackseal' section
+   */
+/*
+  .stackseal (ORIGIN(SRAM1) + LENGTH(SRAM1) - __STACKSEAL_SIZE) (NOLOAD) :
+  {
+    . = ALIGN(8);
+    __StackSeal = .;
+    . = . + 8;
+    . = ALIGN(8);
+  } > SRAM1
+*/
+
+  /* Check if data + heap + stack exceeds SRAM1 limit */
+  ASSERT(__StackLimit >= __HeapLimit, "region SRAM1 overflowed with stack")
 }

@@ -259,33 +259,33 @@ const void * isr_vectors[] __attribute__((section(".isr_vector"))) = {
 void Reset_Handler(void)
 {
   extern int main(void);
-  
+
+  __set_MSP((uint32_t)(&_estack));
+
   /* CMSIS System Initialization */
   SystemInit();
 
   // Copy .data from FLASH to SRAM
-  unsigned int data_size = (unsigned int)&_edata - (unsigned int)&_sdata;
-  unsigned char *flash_data = (unsigned char*) &_etext;
-  unsigned char *sram_data = (unsigned char*) &_sdata;
+  unsigned int *flash_data = &_etext;
+  unsigned int *sram_data  = &_sdata;
   
-  for (unsigned int i = 0; i < data_size; i++)
-  {
-    sram_data[i] = flash_data[i];
+  for (; sram_data < &_edata; sram_data++, flash_data++) {
+    *sram_data = *flash_data;
   }
 
   // Zero-fill .bss section in SRAM
-  unsigned int bss_size = (unsigned int)&_ebss - (unsigned int)&_sbss;
-  unsigned char *bss = (unsigned char*) &_sbss;
+  unsigned int *bss = &_sbss;
 
-  for (unsigned int i = 0; i < bss_size; i++)
-  {
-    bss[i] = 0;
+  for (; bss < &_ebss; bss++) {
+    *bss = 0;
   }
 
   // __libc_init_array();
 
   // Go to main
   main();
+
+  while(1);
 }
 
 
