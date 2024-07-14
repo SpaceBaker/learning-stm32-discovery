@@ -184,7 +184,7 @@ $(BIN_DIR)/$(TARGET).srec: $(BIN_DIR)/$(TARGET).elf
 	@echo Converting .elf to .srec
 	$(OBJCOPY) -O srec $< $@
 
-#------------- Rules for avrdude (programmer) -------------
+#------------- Rules for openocd -------------
 .PHONY: flash
 
 flash: $(BIN_DIR)/$(TARGET).elf
