@@ -30,15 +30,13 @@
 /*---------------------------------------------------------------------------
   External References
  *---------------------------------------------------------------------------*/
-extern unsigned int _sdata;
-extern unsigned int _sbss;
-extern unsigned int _estack;
-extern unsigned int _etext;
-extern unsigned int _edata;
-extern unsigned int _ebss;
-#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
-extern uint32_t __STACK_SEAL;
-#endif
+extern unsigned int __text_start__;
+extern unsigned int __text_end__;
+extern unsigned int __data_start__;
+extern unsigned int __data_end__;
+extern unsigned int __bss_start__;
+extern unsigned int __bss_end__;
+extern unsigned int __stack_start__;
 
 
 /*---------------------------------------------------------------------------
@@ -149,8 +147,14 @@ void FPU_IRQHandler                (void) __attribute__ ((weak, alias("Default_H
   Exception / Interrupt Vector table
  *----------------------------------------------------------------------------*/
 
-const void * isr_vectors[] __attribute__((section(".isr_vector"))) = {
-  &_estack,                             /*     Initial Stack Pointer */
+#if defined ( __GNUC__ )
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
+
+const void * g_pfnVectors[] __attribute__((used, section(".isr_vector"))) = {
+  &__stack_start__,                     /*     Initial Stack Pointer */
   &Reset_Handler,                       /*     Reset Handler */
   &NMI_Handler,                         /* -14 NMI Handler */
   &HardFault_Handler,                   /* -13 Hard Fault Handler */
@@ -251,6 +255,9 @@ const void * isr_vectors[] __attribute__((section(".isr_vector"))) = {
   &FPU_IRQHandler
 };
 
+#if defined ( __GNUC__ )
+#pragma GCC diagnostic pop
+#endif
 
 /*---------------------------------------------------------------------------
   Reset Handler called on controller reset
@@ -260,23 +267,19 @@ void Reset_Handler(void)
 {
   extern int main(void);
 
-  __set_MSP((uint32_t)(&_estack));
-
   /* CMSIS System Initialization */
   SystemInit();
 
   // Copy .data from FLASH to SRAM
-  unsigned int *flash_data = &_etext;
-  unsigned int *sram_data  = &_sdata;
-  
-  for (; sram_data < &_edata; sram_data++, flash_data++) {
+  unsigned int *flash_data = &__text_end__;
+  unsigned int *sram_data  = &__data_start__;
+  for (; sram_data < &__data_end__; sram_data++, flash_data++) {
     *sram_data = *flash_data;
   }
 
   // Zero-fill .bss section in SRAM
-  unsigned int *bss = &_sbss;
-
-  for (; bss < &_ebss; bss++) {
+  unsigned int *bss = &__bss_start__;
+  for (; bss < &__bss_end__; bss++) {
     *bss = 0;
   }
 
@@ -285,6 +288,7 @@ void Reset_Handler(void)
   // Go to main
   main();
 
+  // If main exit
   while(1);
 }
 
@@ -296,7 +300,6 @@ void HardFault_Handler(void)
 {
   while(1);
 }
-
 
 /*---------------------------------------------------------------------------
   Default Handler for Exceptions / Interrupts

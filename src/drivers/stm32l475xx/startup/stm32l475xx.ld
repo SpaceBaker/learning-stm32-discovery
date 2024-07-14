@@ -7,7 +7,6 @@
 **
 ** @brief       : Linker script for STM32L475VGTx Device from STM32L4 series
 **                      1024Kbytes ROM
-**                      96Kbytes   RAM
 **                      96Kbytes   SRAM1
 **                      32Kbytes   SRAM2
 **
@@ -36,16 +35,16 @@
 /* Memory sections visualization
  *
  *     Code memory (FLASH)                                         Data memory (SRAM)
- *   ----------------------                                      ----------------------
+ *   ----------------------                                      ---------------------- ----> __stack_end__
  *   | Unused code memory |                                      |       Stack        | 
  *   |                    |                                      |                    | |
  *   |                    |                                      |                    | v
- *   |--------------------| ----> _edata                         |--------------------|
+ *   |--------------------| ----> __data_end__                   |--------------------| ----> __stack_start__ 
  *   |      .data         |                                      |    Unused SRAM     |
- *   |--------------------| ----> _sdata                         |--------------------| ^
+ *   |--------------------| ----> __data_start__                 |--------------------| ^ --> __heap_end__
  *   |     .rodata        |                                      |       Heap         | |
- *   |--------------------| ----> _etext                         |                    | 
- *   |      .text         |                                      |--------------------|
+ *   |--------------------| ----> __text_end__                   |                    | 
+ *   |      .text         |                                      |--------------------| ----> __heap_start__
  *   |                    |                                      |       .bss         |
  *   |                    |                                      |                    |
  *   |--------------------|                                      |--------------------|
@@ -58,13 +57,9 @@
 */
 
 
+/* Stack and Heap configuration */
 __STACK_SIZE = 0x00000400;
 __HEAP_SIZE  = 0x00000C00;
-
-/* ARMv8-M stack sealing:
-   to use ARMv8-M stack sealing set __STACKSEAL_SIZE to 8 otherwise keep 0
- */
-__STACKSEAL_SIZE = 0;
 
 
 /* Memories definition */
@@ -75,8 +70,11 @@ MEMORY
   FLASH   (rx) : ORIGIN = 0x08000000, LENGTH = 1024K
 }
 
+
 /* Highest address of the user mode stack */
-_estack = ORIGIN(SRAM1) + LENGTH(SRAM1) - __STACK_SIZE - __STACKSEAL_SIZE;
+__stack_start__ = ORIGIN(SRAM1) + LENGTH(SRAM1) - __STACK_SIZE;
+
+
 
 /* Entry Point */
 ENTRY(Reset_Handler)
@@ -85,87 +83,127 @@ ENTRY(Reset_Handler)
 /* Sections */
 SECTIONS
 {
-  /* The program code and other data into "ROM" type memory */
+  /* The program code and other rodata into "ROM" type memory */
   .text :
   {
     . = ALIGN(4);
-    *(.isr_vector)     /* .isr_vector sections (startup code) */
-    *(.text)           /* .text sections (code) */
-    *(.text*)          /* .text* sections (code) */
-    *(.glue_7)         /* glue arm to thumb code */
-    *(.glue_7t)        /* glue thumb to arm code */
+    __text_start__ = .;
+
+    /* The vector table defines the initial stack pointer and interrupt/exception routines */
+    KEEP(*(.isr_vector))
+
+    /* Include code and read-only data sections from all input files. /*
+    *(.text .text* .gnu.linkonce.t.*)
+    *(.rodata .rodata* .gnu.linkonce.r.*)
+  
+    /* Compiler generated helper functions */
+    *(.glue_7 .glue_7t)
+
+    /* Data used to unwind the stack when an exception is thrown */
     *(.eh_frame)
+
+    /* C++ Runtime: initializers for static variables.
+       C Runtime: designated constructors */
     . = ALIGN(4);
-    _etext = .;        /* end of text global symbol */
+    KEEP(*(.init))
+    . = ALIGN(4);
+    __preinit_array_start = .;
+    KEEP (*(.preinit_array))
+    __preinit_array_end = .;
+
+    . = ALIGN(4);
+    __init_array_start = .;
+    KEEP (*(SORT(.init_array.*)))
+    KEEP (*(.init_array))
+    __init_array_end = .;
+
+    /* C++ runtime: destructors for static variables.
+       C runtime: designated finializers */
+    . = ALIGN(4);
+    KEEP(*(.fini))
+
+    . = ALIGN(4);
+    __fini_array_start = .;
+    KEEP (*(.fini_array))
+    KEEP (*(SORT(.fini_array.*)))
+    __fini_array_end = .;
+
+    /* C++ runtime: static constructors */
+    . = ALIGN(4);
+    KEEP (*crtbegin.o(.ctors))
+    KEEP (*(EXCLUDE_FILE (*crtend.o) .ctors))
+    KEEP (*(SORT(.ctors.*)))
+    KEEP (*crtend.o(.ctors))
+
+    /* C++ runtime: static destructors and atexit() */
+    . = ALIGN(4);
+    KEEP (*crtbegin.o(.dtors))
+    KEEP (*(EXCLUDE_FILE (*crtend.o) .dtors))
+    KEEP (*(SORT(.dtors.*)))
+    KEEP (*crtend.o(.dtors))
+
+    . = ALIGN(4);
   } >FLASH
 
-  /* Constant data into "ROM" type memory */
-  .rodata :
+  /* ARM special sections for exception handling */
+  .ARM.extab :
   {
-    . = ALIGN(4);
-    *(.rodata)         /* .rodata sections (constants, strings, etc.) */
-    *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
-    . = ALIGN(4);
+    *(.ARM.extab* .gnu.linkonce.armextab.*)
+  } >FLASH
+
+  .ARM.exidx :
+  {
+    PROVIDE (__exidx_start = .);
+    *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+    PROVIDE (__exidx_end = .);
   } >FLASH
 
   /* Initialized data sections into "RAM" type memory */
   .data :
   {
     . = ALIGN(4);
-    _sdata = .;        /* start of data section global symbol */
-    *(.data)           /* .data sections */
-    *(.data*)          /* .data* sections */
-    *(.RamFunc)        /* .RamFunc sections */
-    *(.RamFunc*)       /* .RamFunc* sections */
+    __data_start__ = .;
+    *(.data .data*)
+    *(.RamFunc .RamFunc*)
     . = ALIGN(4);
-    _edata = .;        /* end of data section global symbol */
+    __data_end__ = .;
   } >SRAM1 AT>FLASH
 
+  __text_end__ = LOADADDR(.data);
+
   /* Uninitialized data section into "RAM" type memory */
-  . = ALIGN(4);
-  .bss :
+  .bss (NOLOAD):
   {
-    /* This is used by the startup in order to initialize the .bss section */
-    _sbss = .;         /* start of bss section global symbol */
-    *(.bss)
-    *(.bss*)
+    . = ALIGN(4);
+    __bss_start__ = .;
+    *(.bss .bss*)
     *(COMMON)
     . = ALIGN(4);
-    _ebss = .;         /* end of bss section global symbol */
+    __bss_end__ = .;
   } >SRAM1
 
+  /* Heap grows up */
   .heap (NOLOAD) :
   {
     . = ALIGN(4);
-    __end__ = .;
-    PROVIDE(end = .);
+    __heap_start__ = .;
     . = . + __HEAP_SIZE;
     . = ALIGN(4);
-    __HeapLimit = .;
+    __heap_end__ = .;
+    PROVIDE(__HeapLimit = .);
   } > SRAM1
 
-  .stack (_estack) (NOLOAD) :
+  /* Stack grows down */
+  .stack (__stack_start__) (NOLOAD) :
   {
-    . = ALIGN(4);
-    __StackLimit = .;
+    /* The ARM procedure call standard (AAPCS) requires the stack to be aligned on an eight byte boundary */
+    . = ALIGN(8);
+    PROVIDE(__StackLimit = .);
     . = . + __STACK_SIZE;
     . = ALIGN(4);
-    __StackTop = .;
+    PROVIDE(__StackTop = .);
+    __stack_end__ = .;
   } > SRAM1
-  PROVIDE(__stack = __StackTop);
-
-    /* ARMv8-M stack sealing:
-     to use ARMv8-M stack sealing uncomment '.stackseal' section
-   */
-/*
-  .stackseal (ORIGIN(SRAM1) + LENGTH(SRAM1) - __STACKSEAL_SIZE) (NOLOAD) :
-  {
-    . = ALIGN(8);
-    __StackSeal = .;
-    . = . + 8;
-    . = ALIGN(8);
-  } > SRAM1
-*/
 
   /* Check if data + heap + stack exceeds SRAM1 limit */
   ASSERT(__StackLimit >= __HeapLimit, "region SRAM1 overflowed with stack")
