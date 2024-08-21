@@ -1,7 +1,6 @@
 #include "stm32l4xx.h"
 #include "system_stm32l4xx.h"
 #include <stdbool.h>
-#include <stdint.h>
 
 #include "uart.h"
 // #include "common/ringbuffer.h"
@@ -156,4 +155,15 @@ uint8_t uart_getchar(void)
     while (!_uart_rx_data_reg_not_empty());
     data = UART4->RDR;
     return data;
+}
+
+void uart_transmit(char * tx_buf, size_t size)
+{
+    if ((NULL == tx_buf) || (size == 0)) {
+        return;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        uart_putchar((uint8_t)tx_buf[i]);
+    }
 }

@@ -17,24 +17,6 @@ void clock_system_init(void);
 void gpio_init(void);
 
 
-static inline void hello_world(void)
-{
-	uart_putchar('H');
-	uart_putchar('e');
-	uart_putchar('l');
-	uart_putchar('l');
-	uart_putchar('o');
-	uart_putchar(' ');
-	uart_putchar('W');
-	uart_putchar('o');
-	uart_putchar('r');
-	uart_putchar('l');
-	uart_putchar('d');
-	uart_putchar('!');
-	uart_putchar('\n');
-}
-
-
 int main(void)
 {
     __disable_irq();
@@ -51,10 +33,10 @@ int main(void)
     {
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
-		hello_world();
+		uart_transmit("Hello World!\r\n", sizeof("Hello World!\r\n"));
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		hello_world();
+		uart_transmit("Hello World!\r\n", sizeof("Hello World!\r\n"));
     }
 }
 
