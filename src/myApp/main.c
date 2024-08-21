@@ -1,10 +1,10 @@
 #include <stm32l4xx.h>
 #include <system_stm32l4xx.h>
 #include <stdint.h>
-
-
-#define LED_PORT GPIOB
-#define LED_PIN  (1<<14)
+#include "bsp/gpiomap.h"
+#include "bsp/clock.h"
+#include "stm32l475xx.h"
+#include "usart/uart.h"
 
 
 volatile uint32_t sysTick_ms = 0;
@@ -14,7 +14,25 @@ volatile uint32_t sysTick_ms = 0;
 void SysTick_Handler(void);
 void delay_ms(uint32_t ms);
 void clock_system_init(void);
-void led_init(void);
+void gpio_init(void);
+
+
+static inline void hello_world(void)
+{
+	uart_putchar('H');
+	uart_putchar('e');
+	uart_putchar('l');
+	uart_putchar('l');
+	uart_putchar('o');
+	uart_putchar(' ');
+	uart_putchar('W');
+	uart_putchar('o');
+	uart_putchar('r');
+	uart_putchar('l');
+	uart_putchar('d');
+	uart_putchar('!');
+	uart_putchar('\n');
+}
 
 
 int main(void)
@@ -23,15 +41,20 @@ int main(void)
     clock_system_init();
     SystemCoreClockUpdate();
     SysTick_Config(SystemCoreClock/1000);
-    led_init();
+    gpio_init();
+	uart_init(UART_BAUDRATE);
     __enable_irq();
+
+	uart_enable();
 
     while(1)
     {
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
+		hello_world();
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BR14;
+		hello_world();
     }
 }
 
@@ -70,7 +93,7 @@ void clock_system_init(void)
 	// CLEAR_BIT(RCC->CFGR, RCC_CFGR_STOPWUCK); // Wakeup from Stop and CSS backup clock select (MSI is default)
 	// CLEAR_BIT(RCC->CFGR, RCC_CFGR_PPRE2);	// APB(2) high-speed prescaler (HCLK/1 is default) -> (PCLK2) 
 	// CLEAR_BIT(RCC->CFGR, RCC_CFGR_PPRE1);	// APB(1) low-speed prescaler (HCLK/1 is default) -> (PCLK1)
-	// CLEAR_BIT(RCC->CFGR, RCC_CFGR_HPRE);		// AHB prescaler (SYSCLK/1 is default)
+	// CLEAR_BIT(RCC->CFGR, RCC_CFGR_HPRE);		// AHB prescaler (SYSCLK/1 is default) -> HCLK
 	// MODIFY_REG(RCC->CFGR, RCC_CFGR_SW, RCC_CFGR_SW_MSI); // System clock switch (MSI is default) -> SYSCLK
 
 	/* PLL configuration register (RCC_PLLCFGR) - reset value 0x0001000 */
@@ -149,7 +172,7 @@ void clock_system_init(void)
 	/* AHB2 peripheral clock enable register (RCC_AHB2ENR) - reset value 0x00000000 */
 	/* AHB2 peripheral clocks enable in Sleep and Stop modes register (RCC_AHB2SMENR) - reset value 0x000532FF*/
 	// Enable --RNG, ADC, USB-OTG, GPIO-- clock here
-	SET_BIT(RCC->AHB2ENR, RCC_AHB2ENR_GPIOBEN);	// Enable clock for gpio port B
+	SET_BIT(RCC->AHB2ENR, RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOBEN);
 
 	/* AHB3 peripheral clock enable register (RCC_AHB3ENR) - reset value 0x00000000 */
 	/* AHB3 peripheral clocks enable in Sleep and Stop modes register (RCC_AHB3SMENR) - reset value 0x000000101 */
@@ -161,7 +184,7 @@ void clock_system_init(void)
 
 	/* APB1 peripheral clock enable register 2 (RCC_APB1ENR2) - reset value 0x00000000 */
 	/* APB1 peripheral clocks enable in Sleep and Stop modes register 2 (RCC_APB1SMENR2) - reset value 0x00000025 */
-	// Enable --LPTIM, SWP, I2C, LPUART-- clock here
+	SET_BIT(RCC->APB1ENR1, RCC_APB1ENR1_UART4EN);
 
 	/* APB2 peripheral clock enable register (RCC_APB2ENR) - reset value 0x00000000 */
 	/* APB2 peripheral clocks enable in Sleep and Stop modes register (RCC_APB2SMENR) - reset value 0x01677C01 */
@@ -170,11 +193,25 @@ void clock_system_init(void)
 	}
 }
 
-void led_init(void)
+void gpio_init(void)
 {
-    // LED gpio configuration
-    MODIFY_REG(LED_PORT->MODER, GPIO_MODER_MODER14, GPIO_MODER_MODER14_0);  // Set GPIOB Pin 14 as General Purpose Output
-    CLEAR_BIT(LED_PORT->OTYPER, GPIO_OTYPER_OT_14);                         // Set to push-pull Pin 14
-    CLEAR_BIT(LED_PORT->OSPEEDR, GPIO_OSPEEDR_OSPEED14);                    // Set speed to low on Pin 14
-    CLEAR_BIT(LED_PORT->PUPDR, GPIO_PUPDR_PUPDR14);                         // Set to no-pull-up/down Pin 14
+    /* LED gpio configuration */
+	// Set GPIOB[14] as General Purpose Output
+    MODIFY_REG(LED_PORT->MODER, GPIO_MODER_MODER14, GPIO_MODER_MODER14_0);
+    // Set GPIOB[14] to push-pull
+	CLEAR_BIT(LED_PORT->OTYPER, GPIO_OTYPER_OT_14);
+    // Set GPIOB[14] speed to low on
+	CLEAR_BIT(LED_PORT->OSPEEDR, GPIO_OSPEEDR_OSPEED14);
+    // Set GPIOB[14] to no-pull-up/down
+	CLEAR_BIT(LED_PORT->PUPDR, GPIO_PUPDR_PUPD14);
+
+	/* UART4 gpio configuration */
+	// Set GPIOA[1:0] alternate function to UART4 (tx and rx)
+	MODIFY_REG(UART_PORT->AFR[0], (GPIO_AFRL_AFSEL0_Msk | GPIO_AFRL_AFSEL1_Msk), 
+								  (GPIO_AFRL_AFSEL0_3 | GPIO_AFRL_AFSEL1_3));
+	// Set GPIOA pin[1:0] as alternate function
+	MODIFY_REG(UART_PORT->MODER, GPIO_MODER_MODER0 | GPIO_MODER_MODER1,
+								 GPIO_MODER_MODER0_1 | GPIO_MODER_MODER1_1);
+    // Set to no-pull-up/down GPIOA[1:0]
+    CLEAR_BIT(UART_PORT->PUPDR, GPIO_PUPDR_PUPD0 | GPIO_PUPDR_PUPD1);
 }

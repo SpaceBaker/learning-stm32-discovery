@@ -76,7 +76,6 @@ INCS =	$(SRC_DIR) \
 		$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include \
 		$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include/m-profile \
 		$(SRC_DIR)/externals/cmsis_device_l4/Include \
-		$(SRC_DIR)/bsp \
 		$(SRC_DIR)/myApp \
 		$(SRC_DIR)/drivers \
 		$(SRC_DIR)/drivers/stm32l475xx \
