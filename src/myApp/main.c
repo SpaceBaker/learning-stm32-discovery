@@ -33,10 +33,10 @@ int main(void)
     {
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
-		uart_transmit("Hello World!\r\n", sizeof("Hello World!\r\n"));
+		uart_puts("Hello World!\r\n");
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		uart_transmit("Hello World!\r\n", sizeof("Hello World!\r\n"));
+		uart_puts("Hello World!\r\n");
     }
 }
 

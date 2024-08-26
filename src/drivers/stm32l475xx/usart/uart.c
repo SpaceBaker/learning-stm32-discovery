@@ -1,6 +1,7 @@
 #include "stm32l4xx.h"
 #include "system_stm32l4xx.h"
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "uart.h"
 // #include "common/ringbuffer.h"
@@ -142,28 +143,29 @@ void uart_disable(void)
     CLEAR_BIT(UART4->CR1, USART_CR1_UE);
 }
 
-void uart_putchar(uint8_t data)
+void uart_putchar(char c)
 {
-    UART4->TDR = data;
     while (!_uart_tx_data_reg_empty());
+    UART4->TDR = c;
 }
 
-uint8_t uart_getchar(void)
+void uart_puts(char * s)
 {
-    uint8_t data;
-
-    while (!_uart_rx_data_reg_not_empty());
-    data = UART4->RDR;
-    return data;
-}
-
-void uart_transmit(char * tx_buf, size_t size)
-{
-    if ((NULL == tx_buf) || (size == 0)) {
+    if (NULL == s){
         return;
     }
 
-    for (size_t i = 0; i < size; i++) {
-        uart_putchar((uint8_t)tx_buf[i]);
+    while(*s != '\0') {
+        uart_putchar(*s);
+        s++;
     }
+}
+
+char uart_getchar(void)
+{
+    char c;
+
+    while (!_uart_rx_data_reg_not_empty());
+    c = UART4->RDR;
+    return c;
 }

@@ -8,7 +8,6 @@
 
 
 #include <stdint.h>
-#include <stddef.h>
 
 /**
  *  Need to setup system/peripheral clock and gpio before calling this init
@@ -16,9 +15,9 @@
 uint8_t uart_init(uint32_t baudrate);
 void uart_enable(void);
 void uart_disable(void);
-void uart_putchar(uint8_t data);
-uint8_t uart_getchar(void);
-void uart_transmit(char * tx_buf, size_t size);
+void uart_putchar(char c);
+void uart_puts(char * s);
+char uart_getchar(void);
 
 
-#endif /* UART_H */
+#endif /* UART_H */ 
