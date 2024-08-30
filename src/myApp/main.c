@@ -1,13 +1,15 @@
 #include <stm32l4xx.h>
 #include <system_stm32l4xx.h>
 #include <stdint.h>
+#include <stddef.h>
 #include "bsp/gpiomap.h"
 #include "bsp/clock.h"
-#include "stm32l475xx.h"
+#include "stm32l4xx.h"
 #include "usart/uart.h"
 
 
 volatile uint32_t sysTick_ms = 0;
+uart_handle_t myUart = UART4_CONFIG_DEFAULT;
 
 
 /* Function prototypes */
@@ -24,19 +26,20 @@ int main(void)
     SystemCoreClockUpdate();
     SysTick_Config(SystemCoreClock/1000);
     gpio_init();
-	uart_init(UART_BAUDRATE);
+	myUart.config.baudrate = UART_BAUDRATE;
+	uart_init(&myUart);
     __enable_irq();
 
-	uart_enable();
+	uart_enable(&myUart);
 
     while(1)
     {
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
-		uart_puts("Hello World!\r\n");
+		uart_puts(&myUart, "Hello World!\r\n");
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		uart_puts("Hello World!\r\n");
+		uart_puts(&myUart, "Hello World!\r\n");
     }
 }
 
