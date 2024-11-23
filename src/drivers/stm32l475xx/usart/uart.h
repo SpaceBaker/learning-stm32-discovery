@@ -9,6 +9,7 @@
 
 #include "stm32l4xx.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef enum {
     UART_ID_1 = 0,
@@ -89,6 +90,7 @@ typedef struct {
     uart_rx_timeout_t rx_timeout;
     uart_bit_endianness_t bit_endianness;
     uart_int_en_t interrupt_enable;
+    bool echo;
 } uart_config_t;
 
 typedef struct {
@@ -112,6 +114,7 @@ typedef struct {
     .config.rx_timeout = UART_RX_TIMEOUT_DISABLED,\
     .config.bit_endianness = UART_LSB_FIRST,\
     .config.interrupt_enable.reg = 0,\
+    .config.echo = true,\
     .buffer.rx = NULL,\
     .buffer.tx = NULL\
 }
@@ -126,6 +129,7 @@ void uart_disable(uart_handle_t * uart_handle);
 void uart_putchar(uart_handle_t * uart_handle, char c);
 void uart_puts(uart_handle_t * uart_handle, char * s);
 char uart_getchar(uart_handle_t * uart_handle);
+uint16_t uart_gets(uart_handle_t * uart_handle, char * buffer, uint16_t length);
 
 
 #endif /* UART_H */ 

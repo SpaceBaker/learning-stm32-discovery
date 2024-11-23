@@ -10,6 +10,7 @@
 
 volatile uint32_t sysTick_ms = 0;
 uart_handle_t myUart = UART4_CONFIG_DEFAULT;
+char name_buffer[16] = {0};
 
 
 /* Function prototypes */
@@ -36,10 +37,16 @@ int main(void)
     {
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
-		uart_puts(&myUart, "Hello World!\r\n");
-        delay_ms(1000);
+		uart_puts(&myUart, "Hello!\r\n");
+        delay_ms(500);
         LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		uart_puts(&myUart, "Hello World!\r\n");
+		uart_puts(&myUart, "What's your name?\r\n");
+		uart_gets(&myUart, name_buffer, (sizeof(name_buffer)/sizeof(name_buffer[0])));
+        delay_ms(250);
+		uart_puts(&myUart, "Hello ");
+		uart_puts(&myUart, name_buffer);
+		uart_puts(&myUart, "\r\n");
+		uart_puts(&myUart, "\r\n");
     }
 }
 

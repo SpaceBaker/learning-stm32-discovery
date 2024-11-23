@@ -18,11 +18,6 @@ static uint8_t uart_init_status = 0;
 // static ringbuffer_t rx_ringbuffer;
 
 /*------------------------- Private functions -------------------------------*/
-static inline void _uart_disable(USART_TypeDef * usart_reg);
-static inline void _uart_enable(USART_TypeDef * usart_reg);
-static inline void _uart_putchar(USART_TypeDef * usart_reg, char c);
-static inline void _uart_puts(USART_TypeDef * usart_reg, char * s);
-static inline char _uart_getchar(USART_TypeDef * usart_reg);
 
 static inline USART_TypeDef * _uart_get_base_addr(uart_id_t id)
 {
@@ -92,7 +87,7 @@ void uart_init(uart_handle_t * uart_handle)
     usart_reg = _uart_get_base_addr(uart_handle->id);
 
     /* Reset UART */
-    _uart_disable(usart_reg);
+    uart_disable(uart_handle);
     switch (uart_handle->id) {
         case UART_ID_1:
             SET_BIT(RCC->APB2RSTR, RCC_APB2RSTR_USART1RST);
@@ -235,28 +230,28 @@ void uart_init(uart_handle_t * uart_handle)
     uart_init_status |= 1 << uart_handle->id;
 }
 
-static inline void _uart_enable(USART_TypeDef * usart_reg)
-{
-    if (usart_reg == NULL) {
-        return;
-    }
-
-    SET_BIT(usart_reg->CR1, (USART_CR1_TE | USART_CR1_RE | USART_CR1_UE));
-}
 void uart_enable(uart_handle_t * uart_handle)
 {
+    USART_TypeDef * usart_reg;
+
     if (uart_handle == NULL) {
         return;
     }
 
-    _uart_enable(_uart_get_base_addr(uart_handle->id));
+    usart_reg = _uart_get_base_addr(uart_handle->id);
+
+    SET_BIT(usart_reg->CR1, (USART_CR1_TE | USART_CR1_RE | USART_CR1_UE));
 }
 
-static inline void _uart_disable(USART_TypeDef * usart_reg)
+void uart_disable(uart_handle_t * uart_handle)
 {
-    if (usart_reg == NULL) {
+    USART_TypeDef * usart_reg;
+
+    if (uart_handle == NULL) {
         return;
     }
+
+    usart_reg = _uart_get_base_addr(uart_handle->id);
 
     /* Disable Tx and Rx */
     CLEAR_BIT(usart_reg->CR1, (USART_CR1_TE | USART_CR1_RE));
@@ -269,74 +264,75 @@ static inline void _uart_disable(USART_TypeDef * usart_reg)
     /* Disable UART */
     CLEAR_BIT(usart_reg->CR1, USART_CR1_UE);
 }
-void uart_disable(uart_handle_t * uart_handle)
+
+void uart_putchar(uart_handle_t * uart_handle, char c)
 {
+    USART_TypeDef * usart_reg;
+
     if (uart_handle == NULL) {
         return;
     }
 
-    _uart_disable(_uart_get_base_addr(uart_handle->id));
-}
-
-static inline void _uart_putchar(USART_TypeDef * usart_reg, char c)
-{
-    if (usart_reg == NULL) {
-        return;
-    }
+    usart_reg = _uart_get_base_addr(uart_handle->id);
 
     while (!_uart_tx_data_reg_empty(usart_reg));
     usart_reg->TDR = c;
 }
-void uart_putchar(uart_handle_t * uart_handle, char c)
+
+void uart_puts(uart_handle_t * uart_handle, char * s)
 {
-    if (uart_handle == NULL) {
+    if ((uart_handle == NULL) || (NULL == s)) {
         return;
     }
 
-    _uart_putchar(_uart_get_base_addr(uart_handle->id), c);
-}
-
-static inline void _uart_puts(USART_TypeDef * usart_reg, char * s)
-{
-    if (usart_reg == NULL) {
-        return;
-    }
-
-    if (NULL == s){
-        return;
-    }
-
-    while(*s != '\0') {
-        _uart_putchar(usart_reg, *s);
+    while (*s != '\0') {
+        uart_putchar(uart_handle, *s);
         s++;
     }
 }
-void uart_puts(uart_handle_t * uart_handle, char * s)
-{
-    if (uart_handle == NULL) {
-        return;
-    }
 
-    _uart_puts(_uart_get_base_addr(uart_handle->id), s);
-}
-
-static inline char _uart_getchar(USART_TypeDef * usart_reg)
+char uart_getchar(uart_handle_t * uart_handle)
 {
     char c;
+    USART_TypeDef * usart_reg;
 
-    if (usart_reg == NULL) {
+    if (uart_handle == NULL) {
         return UINT8_MAX;
     }
+
+    usart_reg = _uart_get_base_addr(uart_handle->id);
 
     while (!_uart_rx_data_reg_not_empty(usart_reg));
     c = usart_reg->RDR;
-    return c;
-}
-char uart_getchar(uart_handle_t * uart_handle)
-{
-    if (uart_handle == NULL) {
-        return UINT8_MAX;
+
+    if (uart_handle->config.echo) {
+        uart_putchar(uart_handle, c);
     }
 
-    return _uart_getchar(_uart_get_base_addr(uart_handle->id));
+    return c;
+}
+
+uint16_t uart_gets(uart_handle_t * uart_handle, char * buffer, uint16_t length)
+{
+    uint16_t count = 0;
+
+    if ((uart_handle == NULL) || (buffer == NULL) || (length == 0)) {
+        return 0;
+    }
+
+    do {
+        buffer[count] = uart_getchar(uart_handle);
+        if ((buffer[count] == '\n') || (buffer[count] == '\r')) {
+            count++;
+            break;
+        }
+        count++;
+    } while (count < (length-1));
+    buffer[count] = 0;  // NUL terminating string
+
+    if (uart_handle->config.echo) {
+        uart_puts(uart_handle, "\r\n");
+    }
+
+    return count;
 }
