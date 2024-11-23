@@ -204,22 +204,30 @@ void uart_init(uart_handle_t * uart_handle)
 
     /* Interrupts enable - disable (default) */
     // Character Match
-    MODIFY_REG(usart_reg->CR1, USART_CR1_CMIE_Msk, uart_handle->config.interrupt_enable.bit.cm << USART_CR1_CMIE_Pos);
+    MODIFY_REG(usart_reg->CR1, USART_CR1_CMIE_Msk, 
+        uart_handle->config.interrupt_enable.bit.character_match << USART_CR1_CMIE_Pos);
     // PE interrupt
-    MODIFY_REG(usart_reg->CR1, USART_CR1_PEIE_Msk, uart_handle->config.interrupt_enable.bit.pe << USART_CR1_PEIE_Pos);
+    MODIFY_REG(usart_reg->CR1, USART_CR1_PEIE_Msk, 
+        uart_handle->config.interrupt_enable.bit.parity_error << USART_CR1_PEIE_Pos);
     // TX interrupt
-    MODIFY_REG(usart_reg->CR1, USART_CR1_TXEIE_Msk, uart_handle->config.interrupt_enable.bit.txe << USART_CR1_TXEIE_Pos);
+    MODIFY_REG(usart_reg->CR1, USART_CR1_TXEIE_Msk, 
+        uart_handle->config.interrupt_enable.bit.tx_data_reg_empty << USART_CR1_TXEIE_Pos);
     // Transmission complete interrupt
-    MODIFY_REG(usart_reg->CR1, USART_CR1_TCIE_Msk, uart_handle->config.interrupt_enable.bit.tc << USART_CR1_TCIE_Pos);
+    MODIFY_REG(usart_reg->CR1, USART_CR1_TCIE_Msk, 
+        uart_handle->config.interrupt_enable.bit.transmission_complete << USART_CR1_TCIE_Pos);
     // RXNE interrupt
-    MODIFY_REG(usart_reg->CR1, USART_CR1_RXNEIE_Msk, uart_handle->config.interrupt_enable.bit.rxne << USART_CR1_RXNEIE_Pos);
+    MODIFY_REG(usart_reg->CR1, USART_CR1_RXNEIE_Msk, 
+        uart_handle->config.interrupt_enable.bit.rx_data_reg_not_empty << USART_CR1_RXNEIE_Pos);
     // IDLE interrupt
-    MODIFY_REG(usart_reg->CR1, USART_CR1_IDLEIE_Msk, uart_handle->config.interrupt_enable.bit.idle << USART_CR1_IDLEIE_Pos);
+    MODIFY_REG(usart_reg->CR1, USART_CR1_IDLEIE_Msk, 
+        uart_handle->config.interrupt_enable.bit.idle_line_detected << USART_CR1_IDLEIE_Pos);
     // Receiver timeout interrupt (duration programmed in the RTOR)
     // TODO : write timeout value in RTOR and enable Receiver timeout (CR2_RTOEN)
-    MODIFY_REG(usart_reg->CR1, USART_CR1_RTOIE_Msk, uart_handle->config.interrupt_enable.bit.rto << USART_CR1_RTOIE_Pos);
+    MODIFY_REG(usart_reg->CR1, USART_CR1_RTOIE_Msk, 
+        uart_handle->config.interrupt_enable.bit.rx_timeout << USART_CR1_RTOIE_Pos);
     // Error interrupt
-    MODIFY_REG(usart_reg->CR3, USART_CR3_EIE_Msk, uart_handle->config.interrupt_enable.bit.error << USART_CR3_EIE_Pos);
+    MODIFY_REG(usart_reg->CR3, USART_CR3_EIE_Msk, 
+        uart_handle->config.interrupt_enable.bit.nf_ore_fe << USART_CR3_EIE_Pos);
 
     // ring_buffer_init(&tx_ringbuffer, tx_buffer, (sizeof(tx_buffer)/sizeof(tx_buffer[0])));
     // ring_buffer_init(&rx_ringbuffer, rx_buffer, (sizeof(rx_buffer)/sizeof(rx_buffer[0])));

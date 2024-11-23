@@ -61,19 +61,20 @@ typedef enum {
 
 typedef union {
     struct {
-        uint16_t eob : 1;       /* End of Block interrupt */
-        uint16_t rto : 1;       /* Receiver timeout interrupt */
-        uint16_t cm : 1;        /* Character match interrupt */
-        uint16_t pe : 1;        /* PE interrupt */
-        uint16_t txe : 1;       /* Transmitter Enabled interrupt */
-        uint16_t tc : 1;        /* Transmission completed interrupt */
-        uint16_t rxne : 1;      /* RXNE interrupt */
-        uint16_t idle : 1;      /* Idle line interrupt */
-        uint16_t linbrk : 1;    /* LIN break detection interrupt */
-        uint16_t wake : 1;      /* Wake-up from stop mode interrupt */
-        uint16_t cts : 1;       /* CTS interrupt */
-        uint16_t error : 1;     /* Error interrupt */
-        uint16_t UNUSED : 4;
+        uint16_t tx_data_reg_empty;             // TXEIE
+        uint16_t clear_to_send;                 // CTSIE
+        uint16_t transmission_complete;         // TCIE
+        uint16_t rx_data_reg_not_empty;         // RXNEIE
+        uint16_t overrun_error;                 // RXNEIE
+        uint16_t idle_line_detected;            // IDLEIE
+        uint16_t parity_error;                  // PEIE
+        uint16_t lin_break;                     // LBDIE
+        uint16_t nf_ore_fe;                     // EIE
+        uint16_t character_match;               // CMIE
+        uint16_t rx_timeout;                    // RTOIE
+        uint16_t rx_timeoutend_of_block;        // EOBIE
+        uint16_t wake_from_stop;                // WUFIE
+        uint16_t tx_complete_before_guard_time; //TCBGTIE
     } bit;
     uint16_t reg;
 } uart_int_en_t;
