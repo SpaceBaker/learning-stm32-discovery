@@ -4,13 +4,15 @@
 #include <stddef.h>
 #include "bsp/gpiomap.h"
 #include "bsp/clock.h"
+#include "stm32l475xx.h"
 #include "stm32l4xx.h"
 #include "usart/uart.h"
 
 
 volatile uint32_t sysTick_ms = 0;
+char rx_buffer[UART_BUFFER_LENGTH] = {0};
+char tx_buffer[UART_BUFFER_LENGTH] = {0};
 uart_handle_t myUart = UART4_CONFIG_DEFAULT;
-char name_buffer[16] = {0};
 
 
 /* Function prototypes */
@@ -28,24 +30,46 @@ int main(void)
     SysTick_Config(SystemCoreClock/1000);
     gpio_init();
 	myUart.config.baudrate = UART_BAUDRATE;
+	myUart.buffer.rx = rx_buffer;
+	myUart.buffer.tx = tx_buffer;
 	uart_init(&myUart);
     __enable_irq();
-
 	uart_enable(&myUart);
 
     while(1)
     {
+#if 0	/* Blocking puts/gets Test */
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
 		uart_puts(&myUart, "Hello!\r\n");
         delay_ms(500);
         LED_PORT->BSRR |= GPIO_BSRR_BR14;
 		uart_puts(&myUart, "What's your name?\r\n");
-		uart_gets(&myUart, name_buffer, (sizeof(name_buffer)/sizeof(name_buffer[0])));
+		uart_gets(&myUart, myUart.buffer.rx, UART_BUFFER_LENGTH);
         delay_ms(250);
 		uart_puts(&myUart, "Hello ");
-		uart_puts(&myUart, name_buffer);
+		uart_puts(&myUart, myUart.buffer.rx);
 		uart_puts(&myUart, "\r\n");
+		uart_puts(&myUart, "\r\n");
+#endif
+#if 0	/* TX interrupt Test */
+        delay_ms(1000);
+        LED_PORT->BSRR |= GPIO_BSRR_BS14;
+		uart_send(&myUart, "Hello!\r\n", 8);
+        delay_ms(1000);
+        LED_PORT->BSRR |= GPIO_BSRR_BR14;
+#endif
+		/* RX interrupt Test (leds keep flashing while typing) */
+		uart_puts(&myUart, "What is your name?\r\n");
+		uart_startListen(&myUart, UART_BUFFER_LENGTH, '\r');
+		do {
+			delay_ms(500);
+			LED_PORT->BSRR |= GPIO_BSRR_BS14;
+			delay_ms(500);
+			LED_PORT->BSRR |= GPIO_BSRR_BR14;
+		} while (!uart_msgReceived(&myUart));
+		uart_puts(&myUart, "\tHello ");
+		uart_puts(&myUart, myUart.buffer.rx);
 		uart_puts(&myUart, "\r\n");
     }
 }

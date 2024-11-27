@@ -11,6 +11,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+
+#define UART_BUFFER_LENGTH 64
+
+
 typedef enum {
     UART_ID_1 = 0,
     UART_ID_2,
@@ -130,6 +134,18 @@ void uart_putchar(uart_handle_t * uart_handle, char c);
 void uart_puts(uart_handle_t * uart_handle, char * s);
 char uart_getchar(uart_handle_t * uart_handle);
 uint16_t uart_gets(uart_handle_t * uart_handle, char * buffer, uint16_t length);
+void uart_send(uart_handle_t * uart_handle, char * buffer, uint16_t length);
+void uart_startListen(uart_handle_t * uart_handle, uint16_t msg_max_length, char end_char);
+bool uart_msgReceived(uart_handle_t * uart_handle);
+
+/**
+ * To use interrupts, you must define the following sub-routines in your code :
+ *   void USART1_IRQHandler(void)
+ *   void USART2_IRQHandler(void)
+ *   void USART3_IRQHandler(void)
+ *   void UART4_IRQHandler(void)
+ *   void UART5_IRQHandler(void)
+ */
 
 
 #endif /* UART_H */ 

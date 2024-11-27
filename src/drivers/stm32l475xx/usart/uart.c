@@ -7,15 +7,15 @@
 // #include "common/ringbuffer.h"
 
 /*------------------------- Defines -------------------------------*/
-// #define UART_OVER_SAMPLING_8
-// #define UART_BUFFER_SIZE_MAX 64
 
 /*------------------------- Global private variables -------------------------------*/
+uart_handle_t * pUart4 = NULL;
 static uint8_t uart_init_status = 0;
-// static uint8_t tx_buffer[UART_BUFFER_SIZE_MAX];
-// static uint8_t rx_buffer[UART_BUFFER_SIZE_MAX];
-// static ringbuffer_t tx_ringbuffer;
-// static ringbuffer_t rx_ringbuffer;
+static volatile uint8_t uart4_tx_char_index = 0;
+static volatile uint8_t uart4_tx_bytes_to_send = 0;
+static volatile uint8_t uart4_rx_char_count = 0;
+static volatile uint8_t uart4_rx_bytes_to_receive = 0;
+static volatile char    uart4_rx_end_char = 0;
 
 /*------------------------- Private functions -------------------------------*/
 
@@ -104,6 +104,7 @@ void uart_init(uart_handle_t * uart_handle)
         case UART_ID_4:
             SET_BIT(RCC->APB1RSTR1, RCC_APB1RSTR1_UART4RST);
             CLEAR_BIT(RCC->APB1RSTR1, RCC_APB1RSTR1_UART4RST);
+            pUart4 = uart_handle;
             break;
         case UART_ID_5:
             SET_BIT(RCC->APB1RSTR1, RCC_APB1RSTR1_UART5RST);
@@ -241,10 +242,13 @@ void uart_enable(uart_handle_t * uart_handle)
     usart_reg = _uart_get_base_addr(uart_handle->id);
 
     SET_BIT(usart_reg->CR1, (USART_CR1_TE | USART_CR1_RE | USART_CR1_UE));
+    
+	NVIC_EnableIRQ(UART4_IRQn);
 }
 
 void uart_disable(uart_handle_t * uart_handle)
 {
+    int uart_irqn;
     USART_TypeDef * usart_reg;
 
     if (uart_handle == NULL) {
@@ -260,6 +264,20 @@ void uart_disable(uart_handle_t * uart_handle)
     while (!(usart_reg->ISR & USART_ISR_TC));
 
     // TODO : DMA channel must be disabled before resetting the UE bit
+
+    // Disable UART irq
+    switch (uart_handle->id) {
+        case UART_ID_1: uart_irqn = LPUART1_IRQn; break;
+        case UART_ID_2: uart_irqn = USART2_IRQn;  break;
+        case UART_ID_3: uart_irqn = USART3_IRQn;  break;
+        case UART_ID_4: uart_irqn = UART4_IRQn;   break;
+        case UART_ID_5: uart_irqn = UART5_IRQn;   break;
+        default:        uart_irqn = -1;           break;
+    }
+    if (uart_irqn >= 0) {
+        NVIC_ClearPendingIRQ(uart_irqn);
+        NVIC_DisableIRQ(uart_irqn);
+    }
 
     /* Disable UART */
     CLEAR_BIT(usart_reg->CR1, USART_CR1_UE);
@@ -335,4 +353,87 @@ uint16_t uart_gets(uart_handle_t * uart_handle, char * buffer, uint16_t length)
     }
 
     return count;
+}
+
+void uart_send(uart_handle_t * uart_handle, char * buffer, uint16_t length)
+{
+    USART_TypeDef * usart_reg;
+
+    if ((uart_handle == NULL) || (buffer == NULL) || (length == 0)) {
+        return;
+    }
+
+    usart_reg = _uart_get_base_addr(uart_handle->id);
+
+    if (uart_handle->buffer.tx == NULL) {
+        return;
+    }
+
+    // memcpy
+    for (uint8_t i = 0; i < (length*sizeof(buffer[0])); i++) {
+        pUart4->buffer.tx[i] = buffer[i];
+    }
+    uart4_tx_char_index = 0;
+    uart4_tx_bytes_to_send = length;
+
+    while (!_uart_tx_data_reg_empty(usart_reg));
+    // Enable TX interrupt
+    SET_BIT(usart_reg->CR1, USART_CR1_TXEIE);
+    // Send the first byte
+    usart_reg->TDR = buffer[0];
+}
+
+void uart_startListen(uart_handle_t * uart_handle, uint16_t msg_max_length, char end_char)
+{
+    USART_TypeDef * usart_reg;
+
+    if ((uart_handle == NULL) || (msg_max_length == 0)) {
+        return;
+    }
+
+    usart_reg = _uart_get_base_addr(uart_handle->id);
+
+    if (uart_handle->buffer.rx == NULL) {
+        return;
+    }
+
+    uart4_rx_char_count = 0;
+    uart4_rx_bytes_to_receive = msg_max_length;
+    uart4_rx_end_char = end_char;
+
+    // Enable TX interrupt
+    SET_BIT(usart_reg->CR1, USART_CR1_RXNEIE);
+}
+
+bool uart_msgReceived(uart_handle_t * uart_handle)
+{
+    bool msgReceived = false;
+
+    if (uart_handle->id == UART_ID_4) {
+        msgReceived = ((uart4_rx_char_count >= uart4_rx_bytes_to_receive) || 
+                       (pUart4->buffer.rx[uart4_rx_char_count-1] == uart4_rx_end_char));
+    }
+    return msgReceived;
+}
+
+void UART4_IRQHandler(void)
+{
+    if (_uart_tx_data_reg_empty(UART4)) {
+        if (++uart4_tx_char_index < uart4_tx_bytes_to_send) {
+            UART4->TDR = pUart4->buffer.tx[uart4_tx_char_index];
+        }
+        else {
+            // Disable TX interrupt
+            CLEAR_BIT(UART4->CR1, USART_CR1_TXEIE);
+            // Done transmitting: more to do? maybe set a flag?
+        }
+    }
+    if (_uart_rx_data_reg_not_empty(UART4)) {
+        pUart4->buffer.rx[uart4_rx_char_count++] = UART4->RDR;
+        if ((pUart4->buffer.rx[uart4_rx_char_count-1] == uart4_rx_end_char) || 
+            (uart4_rx_char_count >= uart4_rx_bytes_to_receive)) {
+            // Disable RX interrupt
+            CLEAR_BIT(UART4->CR1, USART_CR1_RXNEIE);
+        }
+    }
 }
