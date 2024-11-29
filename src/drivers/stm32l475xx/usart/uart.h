@@ -104,7 +104,7 @@ typedef struct {
         char * rx;
         char * tx;
     } buffer;
-} uart_handle_t;
+} uart_t;
 
 
 #define UART4_CONFIG_DEFAULT {\
@@ -127,16 +127,16 @@ typedef struct {
 /**
  *  Need to setup system/peripheral clock and gpio before calling this init
  */
-void uart_init(uart_handle_t * uart_handle);
-void uart_enable(uart_handle_t * uart_handle);
-void uart_disable(uart_handle_t * uart_handle);
-void uart_putchar(uart_handle_t * uart_handle, char c);
-void uart_puts(uart_handle_t * uart_handle, char * s);
-char uart_getchar(uart_handle_t * uart_handle);
-uint16_t uart_gets(uart_handle_t * uart_handle, char * buffer, uint16_t length);
-void uart_send(uart_handle_t * uart_handle, char * buffer, uint16_t length);
-void uart_startListen(uart_handle_t * uart_handle, uint16_t msg_max_length, char end_char);
-bool uart_msgReceived(uart_handle_t * uart_handle);
+void uart_init(uart_t * self);
+void uart_enable(uart_t * self);
+void uart_disable(uart_t * self);
+void uart_putchar(uart_t * self, char c);
+void uart_puts(uart_t * self, char * s);
+char uart_getchar(uart_t * self);
+uint16_t uart_gets(uart_t * self, char * buffer, uint16_t length);
+void uart_send(uart_t * self, char * buffer, uint16_t length);
+void uart_startListen(uart_t * self, uint16_t msg_max_length, char end_char);
+bool uart_msgReceived(uart_t * self);
 
 /**
  * To use interrupts, you must define the following sub-routines in your code :

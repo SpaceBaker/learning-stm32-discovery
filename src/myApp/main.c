@@ -12,7 +12,7 @@
 volatile uint32_t sysTick_ms = 0;
 char rx_buffer[UART_BUFFER_LENGTH] = {0};
 char tx_buffer[UART_BUFFER_LENGTH] = {0};
-uart_handle_t myUart = UART4_CONFIG_DEFAULT;
+uart_t myUart = UART4_CONFIG_DEFAULT;
 
 
 /* Function prototypes */
