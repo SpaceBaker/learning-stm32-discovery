@@ -4,12 +4,20 @@
 #include <stddef.h>
 #include "bsp/gpiomap.h"
 #include "bsp/clock.h"
+#include "stm32l475xx.h"
 #include "stm32l4xx.h"
 #include "usart/uart.h"
 
 
+// #define TEST1
+// #define TEST2
+#define TEST3
+
+
 volatile uint32_t sysTick_ms = 0;
-uart_handle_t myUart = UART4_CONFIG_DEFAULT;
+char rx_buffer[UART_BUFFER_LENGTH] = {0};
+char tx_buffer[UART_BUFFER_LENGTH] = {0};
+uart_t myUart = UART4_CONFIG_DEFAULT;
 
 
 /* Function prototypes */
@@ -27,20 +35,58 @@ int main(void)
     SysTick_Config(SystemCoreClock/1000);
     gpio_init();
 	myUart.config.baudrate = UART_BAUDRATE;
-	uart_init(&myUart);
+	uart_init(&myUart, rx_buffer, sizeof(rx_buffer), tx_buffer, sizeof(tx_buffer));
     __enable_irq();
-
 	uart_enable(&myUart);
 
-    while(1)
-    {
+#if defined(TEST1)	/* Blocking puts/gets Test */
+	while(1)
+	{
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
-		uart_puts(&myUart, "Hello World!\r\n");
+		uart_puts(&myUart, "Hello!\r\n");
+        delay_ms(500);
+        LED_PORT->BSRR |= GPIO_BSRR_BR14;
+		uart_puts(&myUart, "What's your name?\r\n");
+		uart_gets(&myUart, myUart.buffer.rx, UART_BUFFER_LENGTH);
+        delay_ms(250);
+		uart_puts(&myUart, "Hello ");
+		uart_puts(&myUart, myUart.buffer.rx);
+		uart_puts(&myUart, "\r\n");
+		uart_puts(&myUart, "\r\n");
+	}
+#elif defined(TEST2)	/* TX interrupt Test */
+	while(1)
+	{
+        delay_ms(1000);
+        LED_PORT->BSRR |= GPIO_BSRR_BS14;
+		uart_send(&myUart, "Hello!\r\n", 8);
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		uart_puts(&myUart, "Hello World!\r\n");
-    }
+	}
+#elif defined(TEST3)	/* RX interrupt Test (leds keep flashing while typing) */
+	uart_puts(&myUart, "What is your name?\r\n");
+	uart_listen(&myUart);
+	while(1)
+	{
+		delay_ms(250);
+		LED_PORT->BSRR |= GPIO_BSRR_BS14;
+        delay_ms(250);
+		LED_PORT->BSRR |= GPIO_BSRR_BR14;
+		// ECHOE
+		if ((!ringbuffer_isEmpty(&myUart.ringbuffer_rx)) &&
+			('\r' == ringbuffer_peek(&myUart.ringbuffer_rx))) {
+			char c;
+			uart_puts(&myUart, "\tHello ");
+			do {
+				c = ringbuffer_get(&myUart.ringbuffer_rx);
+				uart_putchar(&myUart, c);
+			} while('\r' != c);
+			uart_putchar(&myUart, '\n');
+			uart_send(&myUart, "Hi! What is your name again?\r\n", sizeof("Hi, What is your name again?\r\n"));
+		}
+	}
+#endif
 }
 
 
