@@ -10,6 +10,7 @@
 #include "stm32l4xx.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include "common/ringbuffer.h"
 
 
 #define UART_BUFFER_LENGTH 64
@@ -100,10 +101,8 @@ typedef struct {
 typedef struct {
     const uart_id_t id;
     uart_config_t config;
-    struct {
-        char * rx;
-        char * tx;
-    } buffer;
+    ringbuffer_t ringbuffer_tx;
+    ringbuffer_t ringbuffer_rx;
 } uart_t;
 
 
@@ -119,15 +118,15 @@ typedef struct {
     .config.bit_endianness = UART_LSB_FIRST,\
     .config.interrupt_enable.reg = 0,\
     .config.echo = true,\
-    .buffer.rx = NULL,\
-    .buffer.tx = NULL\
+    .ringbuffer_tx.buffer = NULL,\
+    .ringbuffer_rx.buffer = NULL,\
 }
 
 
 /**
  *  Need to setup system/peripheral clock and gpio before calling this init
  */
-void uart_init(uart_t * self);
+void uart_init(uart_t * self, char * rx_buffer, size_t rx_buffer_size, char * tx_buffer, size_t tx_buffer_size);
 void uart_enable(uart_t * self);
 void uart_disable(uart_t * self);
 void uart_putchar(uart_t * self, char c);
@@ -135,8 +134,8 @@ void uart_puts(uart_t * self, char * s);
 char uart_getchar(uart_t * self);
 uint16_t uart_gets(uart_t * self, char * buffer, uint16_t length);
 void uart_send(uart_t * self, char * buffer, uint16_t length);
-void uart_startListen(uart_t * self, uint16_t msg_max_length, char end_char);
-bool uart_msgReceived(uart_t * self);
+void uart_listen(uart_t * self);
+uint8_t uart_msgReceived(uart_t * self);
 
 /**
  * To use interrupts, you must define the following sub-routines in your code :

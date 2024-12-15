@@ -9,6 +9,11 @@
 #include "usart/uart.h"
 
 
+// #define TEST1
+// #define TEST2
+#define TEST3
+
+
 volatile uint32_t sysTick_ms = 0;
 char rx_buffer[UART_BUFFER_LENGTH] = {0};
 char tx_buffer[UART_BUFFER_LENGTH] = {0};
@@ -30,15 +35,13 @@ int main(void)
     SysTick_Config(SystemCoreClock/1000);
     gpio_init();
 	myUart.config.baudrate = UART_BAUDRATE;
-	myUart.buffer.rx = rx_buffer;
-	myUart.buffer.tx = tx_buffer;
-	uart_init(&myUart);
+	uart_init(&myUart, rx_buffer, sizeof(rx_buffer), tx_buffer, sizeof(tx_buffer));
     __enable_irq();
 	uart_enable(&myUart);
 
-    while(1)
-    {
-#if 0	/* Blocking puts/gets Test */
+#if defined(TEST1)	/* Blocking puts/gets Test */
+	while(1)
+	{
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
 		uart_puts(&myUart, "Hello!\r\n");
@@ -51,27 +54,39 @@ int main(void)
 		uart_puts(&myUart, myUart.buffer.rx);
 		uart_puts(&myUart, "\r\n");
 		uart_puts(&myUart, "\r\n");
-#endif
-#if 0	/* TX interrupt Test */
+	}
+#elif defined(TEST2)	/* TX interrupt Test */
+	while(1)
+	{
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BS14;
 		uart_send(&myUart, "Hello!\r\n", 8);
         delay_ms(1000);
         LED_PORT->BSRR |= GPIO_BSRR_BR14;
+	}
+#elif defined(TEST3)	/* RX interrupt Test (leds keep flashing while typing) */
+	uart_puts(&myUart, "What is your name?\r\n");
+	uart_listen(&myUart);
+	while(1)
+	{
+		delay_ms(250);
+		LED_PORT->BSRR |= GPIO_BSRR_BS14;
+        delay_ms(250);
+		LED_PORT->BSRR |= GPIO_BSRR_BR14;
+		// ECHOE
+		if ((!ringbuffer_isEmpty(&myUart.ringbuffer_rx)) &&
+			('\r' == ringbuffer_peek(&myUart.ringbuffer_rx))) {
+			char c;
+			uart_puts(&myUart, "\tHello ");
+			do {
+				c = ringbuffer_get(&myUart.ringbuffer_rx);
+				uart_putchar(&myUart, c);
+			} while('\r' != c);
+			uart_putchar(&myUart, '\n');
+			uart_send(&myUart, "Hi! What is your name again?\r\n", sizeof("Hi, What is your name again?\r\n"));
+		}
+	}
 #endif
-		/* RX interrupt Test (leds keep flashing while typing) */
-		uart_puts(&myUart, "What is your name?\r\n");
-		uart_startListen(&myUart, UART_BUFFER_LENGTH, '\r');
-		do {
-			delay_ms(500);
-			LED_PORT->BSRR |= GPIO_BSRR_BS14;
-			delay_ms(500);
-			LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		} while (!uart_msgReceived(&myUart));
-		uart_puts(&myUart, "\tHello ");
-		uart_puts(&myUart, myUart.buffer.rx);
-		uart_puts(&myUart, "\r\n");
-    }
 }
 
 
