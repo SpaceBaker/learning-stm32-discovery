@@ -12,7 +12,7 @@
 #----------------------------------------------------------------------
 
 #------------- Target -------------
-TARGET = myApp
+TARGET = main
 MCU    = STM32L475xx
 ARCH   = armv7e-m
 CPU	   = cortex-m4
@@ -47,9 +47,8 @@ PROG_RUN_FLAGS 	  = verify reset exit
 # List source files here
 # Exemple : $(wildcard $(SRC_DIR)/bsp/driver/*.c) ...
 # Exemple : $(SRC_DIR)/bsp/driver/i2c.c $(SRC_DIR)/bsp/driver/spi.c) ...
-SRCS =	$(wildcard $(SRC_DIR)/*.c) \
+SRCS =	$(SRC_DIR)/myApp/$(TARGET).c \
 		$(wildcard $(SRC_DIR)/bsp/*.c) \
-		$(wildcard $(SRC_DIR)/myApp/*.c) \
 		$(wildcard $(SRC_DIR)/common/*.c) \
 		$(wildcard $(SRC_DIR)/drivers/*.c) \
 		$(wildcard $(SRC_DIR)/drivers/hts221/*.c) \
