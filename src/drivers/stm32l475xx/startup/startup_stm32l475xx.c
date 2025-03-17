@@ -289,7 +289,7 @@ void Reset_Handler(void)
   main();
 
   // If main exit
-  while(1);
+  while (1);
 }
 
 
@@ -298,7 +298,7 @@ void Reset_Handler(void)
  *---------------------------------------------------------------------------*/
 void HardFault_Handler(void)
 {
-  while(1);
+  while (1);
 }
 
 /*---------------------------------------------------------------------------
@@ -306,5 +306,5 @@ void HardFault_Handler(void)
  *---------------------------------------------------------------------------*/
 void Default_Handler(void)
 {
-  while(1);
+  while (1);
 }

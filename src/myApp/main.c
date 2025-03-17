@@ -1,24 +1,18 @@
-#include <stm32l4xx.h>
-#include <system_stm32l4xx.h>
 #include <stdint.h>
 #include <stddef.h>
-#include "bsp/gpiomap.h"
-#include "bsp/clock.h"
-#include "stm32l475xx.h"
+#include <assert.h>
 #include "stm32l4xx.h"
+#include "system_stm32l4xx.h"
+#include "bsp/gpiomap.h"
 #include "usart/uart.h"
 
 
-// #define TEST1
-// #define TEST2
-#define TEST3
-
-
 volatile uint32_t sysTick_ms = 0;
-char rx_buffer[UART_BUFFER_LENGTH] = {0};
-char tx_buffer[UART_BUFFER_LENGTH] = {0};
-uart_t myUart = UART4_CONFIG_DEFAULT;
-
+char uart_int_msg[] = "UART4 : INTERRUPT\r\n";
+static_assert(sizeof(uart_int_msg) <= UART_BUFFER_LENGTH, "STRING IS TOO LARGE FOR UART BUFFER");
+char uart_blocking_msg[] = "UART4 : BLOCKING\r\n";
+static_assert(sizeof(uart_blocking_msg) <= UART_BUFFER_LENGTH, "STRING IS TOO LARGE FOR UART BUFFER");
+uart_config_t uart_config = UART4_CONFIG_DEFAULT;
 
 /* Function prototypes */
 void SysTick_Handler(void);
@@ -31,82 +25,45 @@ int main(void)
 {
     __disable_irq();
     clock_system_init();
-    SystemCoreClockUpdate();
+	SystemCoreClockUpdate();
     SysTick_Config(SystemCoreClock/1000);
     gpio_init();
-	myUart.config.baudrate = UART_BAUDRATE;
-	uart_init(&myUart, rx_buffer, sizeof(rx_buffer), tx_buffer, sizeof(tx_buffer));
+	uart_init(UART4, uart_config);
     __enable_irq();
-	uart_enable(&myUart);
+	uart_enable(UART4);
 
-#if defined(TEST1)	/* Blocking puts/gets Test */
-	while(1)
+	while (1)
 	{
-        delay_ms(1000);
-        LED_PORT->BSRR |= GPIO_BSRR_BS14;
-		uart_puts(&myUart, "Hello!\r\n");
-        delay_ms(500);
-        LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		uart_puts(&myUart, "What's your name?\r\n");
-		uart_gets(&myUart, myUart.buffer.rx, UART_BUFFER_LENGTH);
-        delay_ms(250);
-		uart_puts(&myUart, "Hello ");
-		uart_puts(&myUart, myUart.buffer.rx);
-		uart_puts(&myUart, "\r\n");
-		uart_puts(&myUart, "\r\n");
+		uart_send(UART4, uart_int_msg, sizeof(uart_int_msg)-1);
+		delay_ms(1000);
+		// LED_PORT->BSRR |= GPIO_BSRR_BS14;
+        // delay_ms(500);
+		// LED_PORT->BSRR |= GPIO_BSRR_BR14;
+		// uart_puts(UART4, uart_blocking_msg);
 	}
-#elif defined(TEST2)	/* TX interrupt Test */
-	while(1)
-	{
-        delay_ms(1000);
-        LED_PORT->BSRR |= GPIO_BSRR_BS14;
-		uart_send(&myUart, "Hello!\r\n", 8);
-        delay_ms(1000);
-        LED_PORT->BSRR |= GPIO_BSRR_BR14;
-	}
-#elif defined(TEST3)	/* RX interrupt Test (leds keep flashing while typing) */
-	uart_puts(&myUart, "What is your name?\r\n");
-	uart_listen(&myUart);
-	while(1)
-	{
-		delay_ms(250);
-		LED_PORT->BSRR |= GPIO_BSRR_BS14;
-        delay_ms(250);
-		LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		// ECHOE
-		if ((!ringbuffer_isEmpty(&myUart.ringbuffer_rx)) &&
-			('\r' == ringbuffer_peek(&myUart.ringbuffer_rx))) {
-			char c;
-			uart_puts(&myUart, "\tHello ");
-			do {
-				c = ringbuffer_get(&myUart.ringbuffer_rx);
-				uart_putchar(&myUart, c);
-			} while('\r' != c);
-			uart_putchar(&myUart, '\n');
-			uart_send(&myUart, "Hi! What is your name again?\r\n", sizeof("Hi, What is your name again?\r\n"));
-		}
-	}
-#endif
 }
 
 
 void SysTick_Handler(void)
 {
     sysTick_ms++;
+	if (0 == (sysTick_ms % 250)) {
+		LED_PORT->ODR ^= ODR_PIN(LED_PIN);
+	}
 }
 
 void delay_ms(uint32_t ms)
 {
     uint32_t delay_end = sysTick_ms + ms;
-    while (sysTick_ms < delay_end);
+    while (sysTick_ms < delay_end){};
 }
 
 void clock_system_init(void)
 {
 	/* Clock control register (RCC_CR) - reset value 0x00000063 */
 	SET_BIT(RCC->CR, RCC_CR_MSION); // Should be default after a reset
-	while(!(RCC->CR & RCC_CR_MSIRDY)); // Wait until MSI is stable (ready)
-	MODIFY_REG(RCC->CR, RCC_CR_MSIRANGE, RCC_CR_MSIRANGE_7); // 8MHz (default 4MHz)
+	while (!(RCC->CR & RCC_CR_MSIRDY)){}; // Wait until MSI is stable (ready)
+	MODIFY_REG(RCC->CR, RCC_CR_MSIRANGE, RCC_CR_MSIRANGE_8); // 16MHz (6 is default 4MHz)
 	SET_BIT(RCC->CR, RCC_CR_MSIRGSEL);
 
 	/*	Read access latency
@@ -144,6 +101,7 @@ void clock_system_init(void)
 
 	/* Peripherals independent clock configuration register (RCC_CCIPR) - reset value 0x00000000 */
 	// DFSDM, SWPMI, ADC, CLK48, SAI, LPTIM, I2C, LPUART, U(S)ART clock select
+	// ATOMIC_CLEAR_BIT(RCC->CCIPR, RCC_CCIPR_UART4SEL_Msk);	// UART4 clock select (PCLK1 is default)
 	
 	/* Backup domain control register (RCC_BDCR) - reset value 0x00000000 */
 	// RTC clock select and enable
@@ -245,4 +203,8 @@ void gpio_init(void)
 								 GPIO_MODER_MODER0_1 | GPIO_MODER_MODER1_1);
     // Set to no-pull-up/down GPIOA[1:0]
     CLEAR_BIT(UART_PORT->PUPDR, GPIO_PUPDR_PUPD0 | GPIO_PUPDR_PUPD1);
+    // Set GPIOA[1:0] to push-pull
+	CLEAR_BIT(UART_PORT->OTYPER, (GPIO_OTYPER_OT_0 | GPIO_OTYPER_OT_1));
+    // Set GPIOA[1:0] speed to very high
+	CLEAR_BIT(UART_PORT->OSPEEDR, (GPIO_OSPEEDR_OSPEED0 | GPIO_OSPEEDR_OSPEED1));
 }
