@@ -1,8 +1,6 @@
 #include "uart.h"
-#include <arm_acle.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "cmsis_gcc.h"
 #include "common/ringbuffer.h"
 #include "stm32l475xx.h"
 #include "stm32l4xx.h"
@@ -163,19 +161,8 @@ void uart_deinit(USART_TypeDef * self)
 
 void uart_enable(USART_TypeDef * self)
 {
-    int uart_irqn;
-
     if (self == NULL) {
         return;
-    }
-
-    switch ((unsigned long)self) {
-        case (unsigned long)USART1: uart_irqn = USART1_IRQn; break;
-        case (unsigned long)USART2: uart_irqn = USART2_IRQn; break;
-        case (unsigned long)USART3: uart_irqn = USART3_IRQn; break;
-        case (unsigned long)UART4:  uart_irqn = UART4_IRQn;  break;
-        case (unsigned long)UART5:  uart_irqn = UART5_IRQn;  break;
-        default: return;
     }
 
     // In asynchronous mode, the following bits must be kept cleared:
@@ -184,9 +171,6 @@ void uart_enable(USART_TypeDef * self)
 
     ATOMIC_SET_BIT(self->CR1, (USART_CR1_UE | USART_CR1_TE));
     while (USART_ISR_TEACK != (self->ISR & USART_ISR_TEACK)){};
-
-    // __NVIC_SetPriority(uart_irqn, 0);    // TODO
-	NVIC_EnableIRQ(uart_irqn);
 }
 
 void uart_disable(USART_TypeDef * self)
@@ -284,9 +268,11 @@ void uart_send(USART_TypeDef * self, char * buffer, uint16_t length)
         return;
     }
 
+    IRQn_Type irqn;
     ringbuffer_t * buffPtr;
     if (USART1 == self) {
         #ifdef UASRT1_INT_MODE_ENABLE
+        irqn = USART1_IRQn;
         buffPtr = &usart1_ringbuffer_tx;
         #else
         return;
@@ -294,6 +280,7 @@ void uart_send(USART_TypeDef * self, char * buffer, uint16_t length)
     }
     else if (USART2 == self) {
         #ifdef USART2_INT_MODE_ENABLE
+        irqn = USART2_IRQn;
         buffPtr = &usart2_ringbuffer_tx;
         #else
         return;
@@ -301,6 +288,7 @@ void uart_send(USART_TypeDef * self, char * buffer, uint16_t length)
     }
     else if (USART3 == self) {
         #ifdef USART3_INT_MODE_ENABLE
+        irqn = USART3_IRQn;
         buffPtr = &usart3_ringbuffer_tx;
         #else
         return;
@@ -308,6 +296,7 @@ void uart_send(USART_TypeDef * self, char * buffer, uint16_t length)
     }
     else if (UART4 == self) {
         #ifdef UART4_INT_MODE_ENABLE
+        irqn = UART4_IRQn;
         buffPtr = &uart4_ringbuffer_tx;
         #else
         return;
@@ -315,6 +304,7 @@ void uart_send(USART_TypeDef * self, char * buffer, uint16_t length)
     }
     else if (UART5 == self) {
         #ifdef UART5_INT_MODE_ENABLE
+        irqn = UART5_IRQn;
         buffPtr = &uart5_ringbuffer_tx;
         #else
         return;
@@ -324,15 +314,20 @@ void uart_send(USART_TypeDef * self, char * buffer, uint16_t length)
         return;
     }
 
+    NVIC_DisableIRQ(irqn);
+
     // memcpy
     for (uint8_t i = 0; i < (length*sizeof(buffer[0])); i++) {
         ringbuffer_put(buffPtr, buffer[i]);
     }
-
+    
     // Enable TX interrupt
     ATOMIC_SET_BIT(self->CR1, USART_CR1_TXEIE);
+    
     // Send the first byte
     self->TDR = ringbuffer_get(buffPtr);
+
+    NVIC_EnableIRQ(irqn);
 }
 
 void uart_listen(USART_TypeDef * self)
@@ -341,9 +336,50 @@ void uart_listen(USART_TypeDef * self)
         return;
     }
 
+    IRQn_Type irqn;
+    if (USART1 == self) {
+        #ifdef UASRT1_INT_MODE_ENABLE
+        irqn = USART1_IRQn;
+        #else
+        return;
+        #endif
+    }
+    else if (USART2 == self) {
+        #ifdef USART2_INT_MODE_ENABLE
+        irqn = USART2_IRQn;
+        #else
+        return;
+        #endif
+    }
+    else if (USART3 == self) {
+        #ifdef USART3_INT_MODE_ENABLE
+        irqn = USART3_IRQn;
+        #else
+        return;
+        #endif
+    }
+    else if (UART4 == self) {
+        #ifdef UART4_INT_MODE_ENABLE
+        irqn = UART4_IRQn;
+        #else
+        return;
+        #endif
+    }
+    else if (UART5 == self) {
+        #ifdef UART5_INT_MODE_ENABLE
+        irqn = UART5_IRQn;
+        #else
+        return;
+        #endif
+    }
+    else {
+        return;
+    }
+
     ATOMIC_SET_BIT(self->CR3, USART_CR3_EIE);
     // Enable RX interrupt
     ATOMIC_SET_BIT(self->CR1, USART_CR1_RXNEIE);
+    NVIC_EnableIRQ(irqn);
 }
 
 uint8_t uart_msgReceived(USART_TypeDef * self)
@@ -397,7 +433,7 @@ uint8_t uart_msgReceived(USART_TypeDef * self)
 
 static void _rxIsr(USART_TypeDef * self, ringbuffer_t * rb)
 {
-    uint8_t rb_error = ringbuffer_put(rb, UART4->RDR);
+    uint8_t rb_error = ringbuffer_put(rb, self->RDR);
     if (rb_error != 0) {
         // TODO : Handling of ringbuffer full
         ATOMIC_CLEAR_BIT(self->CR1, USART_CR1_RXNEIE);
@@ -410,10 +446,10 @@ static void _txIsr(USART_TypeDef * self, ringbuffer_t * rb)
         // Disable the TX interrupt
         ATOMIC_CLEAR_BIT(self->CR1, USART_CR1_TXEIE);
         // Enable the UART Transmit Complete Interrupt
-        ATOMIC_SET_BIT(UART4->CR1, USART_CR1_TCIE);
+        ATOMIC_SET_BIT(self->CR1, USART_CR1_TCIE);
     }
     else {
-        UART4->TDR = ringbuffer_get(rb);
+        self->TDR = ringbuffer_get(rb);
     }
 }
 
@@ -482,7 +518,6 @@ void UART4_IRQHandler(void)
             _rxIsr(UART4, &uart4_ringbuffer_tx);
         }
         // TODO : Handling of error, blocking (aborting xfer) vs non-blocking
-        
         return;
     }
 
