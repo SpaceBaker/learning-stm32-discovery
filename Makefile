@@ -12,12 +12,14 @@
 #----------------------------------------------------------------------
 
 #------------- Target -------------
-TARGET = main
-MCU    = STM32L475xx
-ARCH   = armv7e-m
-CPU	   = cortex-m4
-ABI    = hard
-FPU	   = vfpv4
+TARGET	  ?= main
+BIN_NAME  ?= myApp
+DEVICE	  ?= STM32L475xx
+# ARCH    ?= armv7e-m
+CPU	   	  ?= cortex-m4
+FPU		  ?= fpv4-sp-d16
+FLOAT-ABI ?= hard
+MCU 	   = -mcpu=$(CPU) -mthumb -mfpu=$(FPU) -mfloat-abi=$(FLOAT-ABI)
 # HSE_VALUE  = 8000000 # External oscillator frequency in Hz
 # MSI_VALUE  = 8000000 # Internal oscillator frequency in Hz
 # HSI_VALUE  = 8000000 # Internal oscillator frequency in Hz
@@ -32,81 +34,75 @@ OBJ_DIR    = $(BUILD_DIR)/obj
 #------------- Toolchain -------------
 # Provide the full path if not found in your environment variables
 CC_DIR  = $(HOME)/tools/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi/bin
-AS		= $(CC_DIR)/arm-none-eabi-as
 CC		= $(CC_DIR)/arm-none-eabi-gcc
+AS		= $(CC) -x assembler-with-cpp
+# AS		= $(CC_DIR)/arm-none-eabi-as
 LD		= $(CC_DIR)/arm-none-eabi-ld
 OBJCOPY = $(CC_DIR)/arm-none-eabi-objcopy
 OBJDUMP = $(CC_DIR)/arm-none-eabi-objdump
 SIZE	= $(CC_DIR)/arm-none-eabi-size
 CPPCK	= $(HOME)/tools/cppcheck-2.13.0/build/bin/cppcheck
 PROG	= openocd
-PROG_CONFIG_FLAGS = -f interface/stlink.cfg -f board/stm32l4discovery.cfg
+PROG_CONFIG_FLAGS = -f board/stm32l4discovery.cfg
 PROG_RUN_FLAGS 	  = verify reset exit
 
 
 # List source files here
 # Exemple : $(wildcard $(SRC_DIR)/bsp/driver/*.c) ...
 # Exemple : $(SRC_DIR)/bsp/driver/i2c.c $(SRC_DIR)/bsp/driver/spi.c) ...
-SRCS =	$(SRC_DIR)/myApp/$(TARGET).c \
-		$(wildcard $(SRC_DIR)/bsp/*.c) \
-		$(wildcard $(SRC_DIR)/common/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/hts221/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/ism43362_m3g_l44/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/lis3mdl/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/lps22hb/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/lsm6dsl/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/m24sr/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/mp34dt01/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/mp34dt01mx25r6435f/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/spbtle_rf/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/spsgrf/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/stsafe_a100/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/stsafe_a100vl53l0x/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/vl53l0x/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/stm32l475xx/*.c) \
-		$(wildcard $(SRC_DIR)/drivers/stm32l475xx/*/*.c) \
-		$(SRC_DIR)/externals/cmsis_device_l4/Source/Templates/system_stm32l4xx.c
-		
-# AS_SRCS = $(SRC_DIR)/externals/cmsis_device_l4/Source/Templates/gcc/startup_stm32l475xx.s
+C_SRCS =	$(SRC_DIR)/myApp/$(TARGET).c \
+			$(wildcard $(SRC_DIR)/common/ringbuffer.c) \
+			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/usart/uart.c) \
+			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/startup/system_stm32l4xx.c) \
+			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/startup/startup_stm32l475xx.c) \
+
+AS_SRCS = 
 
 # List header file directories here
 # Exemple : $(SRC_DIR)/bsp/utils
-INCS =	$(SRC_DIR) \
-		$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include \
-		$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include/m-profile \
-		$(SRC_DIR)/externals/cmsis_device_l4/Include \
-		$(SRC_DIR)/myApp \
-		$(SRC_DIR)/common \
-		$(SRC_DIR)/drivers \
-		$(SRC_DIR)/drivers/stm32l475xx \
-		$(SRC_DIR)/drivers/stm32l475xx/startup \
-		$(SRC_DIR)/drivers/stm32l475xx/clock \
+C_INCS =	-I$(SRC_DIR) \
+			-I$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include \
+			-I$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include/m-profile \
+			-I$(SRC_DIR)/externals/cmsis_device_l4/Include \
+			-I$(SRC_DIR)/myApp \
+			-I$(SRC_DIR)/common \
+			-I$(SRC_DIR)/drivers \
+			-I$(SRC_DIR)/drivers/stm32l475xx \
+			-I$(SRC_DIR)/drivers/stm32l475xx/startup \
+			-I$(SRC_DIR)/drivers/stm32l475xx/clock \
+
+AS_INCS =
 
 # List library directories here
 # Exemple : TODO
-# LIBS = 
+STD_LIB = -nostdlib
+LIBS = 
+LIB_DIR =
 
 #------------- Defines -------------
-DEFS = -D$(MCU)
+C_DEFS = -D$(DEVICE)
+AS_DEFS = 
 
 #------------- Optimization Level -------------
 OPT	= -Og
 
 #------------- Warnings Options -------------
-WARNS = -Wall -Wundef -Wextra -Werror
+C_WARNS = -Wall -Wundef -Wextra -Werror
+AS_WARNS = -Wall
 
-#------------- Debugging Format -------------
-DEBUG = -g
+#------------- Debugging -------------
+DEBUG = 1
+DEBUG_FORMAT = -gdwarf-2
 
 #------------- C Language ISO Standard -------------
-CSTD = -std=gnu11
+C_STD = -std=gnu11
 
 #------------- cppcheck flags -------------
 CPPCK_FLAGS = --quiet --error-exitcode=1 --language=c --std=c11 --suppress=unusedFunction
 
 #------------- Linker Script -------------
 LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/startup/stm32l475xx.ld
+# LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/startup/stm32l475vgtx_flash.ld
 
 
 #---------------------------------------------------------------------------------
@@ -114,19 +110,21 @@ LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/startup/stm32l475xx.ld
 #---------------------------------------------------------------------------------
 
 #------------- C Compiler Flags -------------
-CFLAGS = 	-mcpu=$(CPU) -mfloat-abi=$(ABI) -mfpu=$(FPU) -mthumb $(OPT) -ffunction-sections \
-			-fdata-sections $(DEBUG) $(WARNS) $(addprefix -I, $(INCS)) $(CSTD) $(DEFS) -T$(LD_SCRIPT) \
-			-Wl,-Map=$(BIN_DIR)/$(TARGET).map -nostdlib #--specs=debug-nano.specs --specs=debug-nosys.specs 
+C_FLAGS = $(MCU) $(C_STD) $(C_DEFS) $(C_INCS) $(OPT) $(C_WARNS) -fdata-sections -ffunction-sections
+ifeq ($(DEBUG), 1)
+C_FLAGS += -g $(DEBUG_FORMAT)
+endif
 
 #------------- Assembler Flags --------------
-ASFLAGS =	-mcpu=$(CPU) -c -x assembler-with-cpp -mfloat-abi=$(ABI) -mfpu=$(FPU) -mthumb
+AS_FLAGS = $(MCU) $(AS_DEFS) $(AS_WARNS)
 
 #------------- C Linker Flags -------------
 #! Not done here !#
-LDFLAGS = --script=$(LD_SCRIPT) -Map=$(BIN_DIR)/$(TARGET).map --cref -nostdlib --fix-stm32l4xx-629360 #-L $(LIBS)
+# LD_FLAGS = --script=$(LD_SCRIPT) -Map=$(BIN_DIR)/$(BIN_NAME).map --cref -nostdlib --fix-stm32l4xx-629360 #-L $(LIBS)
+LD_FLAGS = $(MCU) $(STD_LIB) -T$(LD_SCRIPT) $(LIB_DIR) $(LIBS) -Wl,-Map=$(BIN_DIR)/$(BIN_NAME).map,--cref,--gc-sections,--fix-stm32l4xx-629360
 
 #------------- Objects -------------
-OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+C_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_SRCS))
 AS_OBJS = $(patsubst $(SRC_DIR)/%.s,$(OBJ_DIR)/%.o,$(AS_SRCS))
 
 
@@ -137,34 +135,34 @@ all: elf hex srec lst
 
 build: elf lst
 
-elf: $(BIN_DIR)/$(TARGET).elf
+elf: $(BIN_DIR)/$(BIN_NAME).elf
 
-$(BIN_DIR)/$(TARGET).elf: $(AS_OBJS) $(OBJS)
+$(BIN_DIR)/$(BIN_NAME).elf: $(AS_OBJS) $(C_OBJS)
 	@echo Compiling $<
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(LD_FLAGS) -o $@ $^
 	@echo Size of your elf file :
 	@$(SIZE) $@
 # @echo Linking $<
 # @mkdir -p $(@D)
-# $(LD) $(LDFLAGS) $^ -o $@
+# $(LD) $(LD_FLAGS) $^ -o $@
 # @echo Size of your elf file :
 # @$(SIZE) $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.s
 	@echo Compiling $<
 	@mkdir -p $(@D)
-	$(AS) $< -o $@
+	$(AS) -c $(AS_FLAGS) $< -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo Compiling $<
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) -c $(C_FLAGS) $< -o $@
 
 #------------- Rules for building the listing file -------------
 .PHONY: lst
 
-lst: $(BIN_DIR)/$(TARGET).lst
+lst: $(BIN_DIR)/$(BIN_NAME).lst
 
 $(BIN_DIR)/%.lst: $(BIN_DIR)/%.elf
 	@echo Listing $<
@@ -173,28 +171,28 @@ $(BIN_DIR)/%.lst: $(BIN_DIR)/%.elf
 #------------- Rules for converting to hex or srec format -------------
 .PHONY: hex srec
 
-hex:  $(BIN_DIR)/$(TARGET).hex
-srec: $(BIN_DIR)/$(TARGET).srec
+hex:  $(BIN_DIR)/$(BIN_NAME).hex
+srec: $(BIN_DIR)/$(BIN_NAME).srec
 
-$(BIN_DIR)/$(TARGET).hex: $(BIN_DIR)/$(TARGET).elf
+$(BIN_DIR)/$(BIN_NAME).hex: $(BIN_DIR)/$(BIN_NAME).elf
 	@echo Converting .elf to .hex
 	$(OBJCOPY) -O ihex $< $@
 
-$(BIN_DIR)/$(TARGET).srec: $(BIN_DIR)/$(TARGET).elf
+$(BIN_DIR)/$(BIN_NAME).srec: $(BIN_DIR)/$(BIN_NAME).elf
 	@echo Converting .elf to .srec
 	$(OBJCOPY) -O srec $< $@
 
 #------------- Rules for openocd -------------
 .PHONY: flash
 
-flash: $(BIN_DIR)/$(TARGET).elf
+flash: $(BIN_DIR)/$(BIN_NAME).elf
 	$(PROG) $(PROG_CONFIG_FLAGS) -c "program $< $(PROG_RUN_FLAGS)"
 
 #------------- Rules for cppcheck -------------
 .PHONY: cppcheck
 
 cppcheck: 
-	@$(CPPCK) $(CPPCK_FLAGS) -I $(INCS) $(SRCS)
+	@$(CPPCK) $(CPPCK_FLAGS) $(C_INCS) $(C_SRCS)
 
 #------------- Other Rules -------------
 .PHONY: clean
