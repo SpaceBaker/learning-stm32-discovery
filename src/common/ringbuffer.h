@@ -20,11 +20,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define RINGBUFFER_SIZE (64)    // Should be a power of 2 for performance
 
 typedef struct ringBuffer {
     uint32_t head;
     uint32_t tail;
+    uint32_t size;
     uint8_t *buffer;
 } ringbuffer_t;
 
@@ -35,7 +35,7 @@ typedef struct ringBuffer {
  * @param buffer    Pointer to the actual buffer
  * @param size      Size of the buffer
  */
-void ringbuffer_init(ringbuffer_t *rb, uint8_t *buffer);
+void ringbuffer_init(ringbuffer_t *rb, uint8_t *buffer, uint32_t size);
 
 /**
  * @brief Resets the ring buffer to empty

@@ -1,7 +1,8 @@
 #include "ringbuffer.h"
 
-void ringbuffer_init(ringbuffer_t *rb, uint8_t *buffer) {
+void ringbuffer_init(ringbuffer_t *rb, uint8_t *buffer, uint32_t size) {
     rb->buffer = buffer;
+    rb->size = size;
     ringbuffer_reset(rb);
 }
 
@@ -11,7 +12,7 @@ void ringbuffer_reset(ringbuffer_t *rb) {
 }
 
 uint8_t ringbuffer_put(ringbuffer_t *rb, uint8_t item) {
-    uint32_t next_head = (rb->head + 1) % RINGBUFFER_SIZE;
+    uint32_t next_head = (rb->head + 1) % rb->size;
 
     if (next_head == rb->tail) {
         return -1;
@@ -29,7 +30,7 @@ uint8_t ringbuffer_get(ringbuffer_t *rb) {
     }
 
     uint8_t item = rb->buffer[rb->tail];
-    rb->tail = (rb->tail + 1) % RINGBUFFER_SIZE;
+    rb->tail = (rb->tail + 1) % rb->size;
 
     return item;
 }
@@ -41,7 +42,7 @@ uint8_t ringbuffer_peek(ringbuffer_t *rb) {
         item = rb->buffer[rb->head];
     }
     else if (rb->head == 0) {
-        item = rb->buffer[RINGBUFFER_SIZE-1];
+        item = rb->buffer[rb->size-1];
     }
     else {
         item = rb->buffer[rb->head-1];
@@ -55,5 +56,5 @@ inline bool ringbuffer_isEmpty(ringbuffer_t *rb) {
 }
 
 inline bool ringbuffer_isFull(ringbuffer_t *rb) {
-    return (((rb->head + 1) % RINGBUFFER_SIZE) == rb->tail);
+    return (((rb->head + 1) % rb->size) == rb->tail);
 }

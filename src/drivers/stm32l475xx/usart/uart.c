@@ -144,8 +144,8 @@ void uart_init(USART_TypeDef * self, uart_config_t config)
     // ATOMIC_CLEAR_BIT(self->CR3, USART_CR3_DMAT);
     // ATOMIC_CLEAR_BIT(self->CR3, USART_CR3_DMAR);
 
-    ringbuffer_init(&uart4_ringbuffer_rx, uart4_rx_buffer);
-    ringbuffer_init(&uart4_ringbuffer_tx, uart4_tx_buffer);
+    ringbuffer_init(&uart4_ringbuffer_rx, uart4_rx_buffer, sizeof(uart4_rx_buffer)/sizeof(uart4_rx_buffer[0]));
+    ringbuffer_init(&uart4_ringbuffer_tx, uart4_tx_buffer, sizeof(uart4_tx_buffer)/sizeof(uart4_tx_buffer[0]));
 }
 
 void uart_deinit(USART_TypeDef * self)
