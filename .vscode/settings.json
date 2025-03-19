@@ -2,7 +2,8 @@
     "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}",
         "--query-driver=${userHome}/tools/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi/bin/arm-none-eabi-*",
-        "--log=verbose"
+        "--log=verbose",
+        "--header-insertion=never"
     ],
     "clangd.path": "${userHome}/tools/clangd_19.1.2/bin/clangd",
     "cortex-debug.variableUseNaturalFormat": true
