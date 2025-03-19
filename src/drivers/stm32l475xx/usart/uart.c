@@ -2,14 +2,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "common/ringbuffer.h"
-#include "stm32l475xx.h"
 #include "stm32l4xx.h"
 
 /*------------------------- Defines -------------------------------*/
 #define UART_ISR_ERROR_MASK (USART_ISR_PE | USART_ISR_FE | USART_ISR_ORE | USART_ISR_NE | USART_ISR_RTOF)
 
 /*------------------------- Global private variables -------------------------------*/
-volatile uint32_t errorFlags = 0;
 uint8_t uart4_tx_buffer[UART_BUFFER_LENGTH] = {0};
 ringbuffer_t uart4_ringbuffer_rx;
 uint8_t uart4_rx_buffer[UART_BUFFER_LENGTH] = {0};
@@ -90,12 +88,151 @@ __attribute__((unused)) static inline bool _uart_reset(USART_TypeDef * self)
     return false;
 }
 
+static inline uint16_t _uart_baudrateToBrrValue(int32_t periphClk, uart_oversampling_t oversampling, uint32_t baudrate)
+{
+    uint32_t brrtemp;
+    
+    if (oversampling == UART_OVERSAMPLING_8) {
+        uint32_t usartdiv;
+        usartdiv = (uint16_t)(((periphClk * 2) + (baudrate / 2)) / baudrate);
+        brrtemp = usartdiv & 0xFFF0U;
+        brrtemp |= (uint16_t)((usartdiv & (uint16_t)0x000FU) >> 1U);
+    }
+    else {
+        brrtemp = (uint16_t)((periphClk + (baudrate / 2)) / baudrate);
+    }
+
+    return brrtemp;
+}
+
+// TODO : timeout
+static void _uart_waitReady(USART_TypeDef * self)
+{
+    if ((self->CR1 & USART_CR1_TE) == USART_CR1_TE) {
+        while ((self->ISR & USART_ISR_TEACK) != USART_ISR_TEACK);
+        // if timeout occured, clear interrupts
+        // ATOMIC_CLEAR_BIT(self->CR1, (USART_CR1_TXEIE));
+    }
+
+    if ((self->CR1 & USART_CR1_RE) == USART_CR1_RE) {
+        while ((self->ISR & USART_ISR_REACK) != USART_ISR_REACK) {
+            // TODO : check Overrun and Receiver Timeout flag
+        }
+        // if timeout occured, clear interrupts
+        // ATOMIC_CLEAR_BIT(self->CR1, (USART_CR1_RXNEIE | USART_CR1_PEIE));
+        // ATOMIC_CLEAR_BIT(self->CR3, USART_CR3_EIE);
+    }
+}
+
+static inline IRQn_Type _uart_getIRQn(USART_TypeDef * self)
+{
+    switch ((unsigned long)self) {
+        case (unsigned long)USART1: return USART1_IRQn;
+        case (unsigned long)USART2: return USART2_IRQn;
+        case (unsigned long)USART3: return USART3_IRQn;
+        case (unsigned long)UART4:  return UART4_IRQn;
+        case (unsigned long)UART5:  return UART5_IRQn;
+        default: {
+            __BKPT();
+            return USART1_IRQn;
+        }
+    }
+}
+
+static inline ringbuffer_t * _uart_getRingbufferTx(USART_TypeDef * self)
+{    
+    switch ((unsigned long)self) {
+        case (unsigned long)USART1: {
+            #ifdef UASRT1_INT_MODE_ENABLE
+            return &usart1_ringbuffer_tx;
+            #else
+            return NULL;
+            #endif
+        }
+        case (unsigned long)USART2: {
+            #ifdef USART2_INT_MODE_ENABLE
+            return &usart2_ringbuffer_tx;
+            #else
+            return NULL;
+            #endif
+        }
+        case (unsigned long)USART3: {
+            #ifdef USART3_INT_MODE_ENABLE
+            return &usart3_ringbuffer_tx;
+            #else
+            return NULL;
+            #endif
+        }
+        case (unsigned long)UART4:  {
+            #ifdef UART4_INT_MODE_ENABLE
+            return &uart4_ringbuffer_tx;
+            #else
+            return NULL;
+            #endif
+        }
+        case (unsigned long)UART5:  {
+            #ifdef UART5_INT_MODE_ENABLE
+            return &uart5_ringbuffer_tx;
+            #else
+            return NULL;
+            #endif
+        }
+        default: {
+            __BKPT();
+            return NULL;
+        }
+    }
+}
+
+static inline ringbuffer_t * _uart_getRingbufferRx(USART_TypeDef * self)
+{    
+    switch ((unsigned long)self) {
+        case (unsigned long)USART1: {
+            #ifdef UASRT1_INT_MODE_ENABLE
+            return &usart1_ringbuffer_rx;
+            #else
+            return NULL;
+            #endif
+        }
+        case (unsigned long)USART2: {
+            #ifdef USART2_INT_MODE_ENABLE
+            return &usart2_ringbuffer_rx;
+            #else
+            return NULL;
+            #endif
+        }
+        case (unsigned long)USART3: {
+            #ifdef USART3_INT_MODE_ENABLE
+            return &usart3_ringbuffer_rx;
+            #else
+            return NULL;
+            #endif
+        }
+        case (unsigned long)UART4:  {
+            #ifdef UART4_INT_MODE_ENABLE
+            return &uart4_ringbuffer_rx;
+            #else
+            return NULL;
+            #endif
+        }
+        case (unsigned long)UART5:  {
+            #ifdef UART5_INT_MODE_ENABLE
+            return &uart5_ringbuffer_rx;
+            #else
+            return NULL;
+            #endif
+        }
+        default: {
+            __BKPT();
+            return NULL;
+        }
+    }
+}
+
 
 /*------------------------- Public functions -------------------------------*/
 void uart_init(USART_TypeDef * self, uart_config_t config)
 {
-    uint32_t brr_value;
-
     if (NULL == self) {
         return;
     }
@@ -103,49 +240,40 @@ void uart_init(USART_TypeDef * self, uart_config_t config)
     // Disable and reset usart
     uart_deinit(self);
 
+    /*------------- USARTx CR1 Configuration -------------*/
     /* Word length - 8 data bits (default) */
-    // TODO : param assert
     MODIFY_REG(self->CR1, USART_CR1_M_Msk, config.word_length);
-
-    /* Oversampling mode - 16 (default) */ 
-    switch (config.oversampling) {
-        case UART_OVERSAMPLING_8:
-            ATOMIC_SET_BIT(self->CR1, USART_CR1_OVER8);
-            brr_value = 2 * SystemCoreClock / config.baudrate;
-            break;
-        case UART_OVERSAMPLING_16:
-        default:
-            ATOMIC_CLEAR_BIT(self->CR1, USART_CR1_OVER8);
-            brr_value = SystemCoreClock / config.baudrate;
-            break;
-    }
-    
-    /* UART baudrate - 0 (default) */
-    self->BRR = brr_value;
-
     /* Parity control - disabled (default) */
-    // TODO : param assert
     MODIFY_REG(self->CR1, (USART_CR1_PS_Msk | USART_CR1_PCE_Msk), config.parity);
+    /* Direction Tx and/or Rx - disabled (default) */
+    MODIFY_REG(self->CR1, (USART_CR1_TE_Msk | USART_CR1_RE_Msk), config.direction);
+    /* Oversampling mode - 16 (default) */
+    MODIFY_REG(self->CR1, USART_CR1_OVER8_Msk, config.oversampling);
 
+    /*------------- USARTx CR2 Configuration -------------*/
+    /* STOP bits - 1 (default) */
+    MODIFY_REG(self->CR2, (USART_CR2_STOP_Msk), config.bit_endianness);
     /* Bit endianness - Tx/Rx bit0 first (default) */
-    // TODO : param assert
     MODIFY_REG(self->CR2, (USART_CR2_MSBFIRST_Msk), config.bit_endianness);
 
-    /* Logic level inversion - normal (default) */
-    // CLEAR_BIT(self->CR2, USART_CR2_TXINV);
-    // ATOMIC_CLEAR_BIT(self->CR2, USART_CR2_RXINV);
-
-    /* STOP bits - 1 (default) */
-    // TODO : param assert
-    MODIFY_REG(self->CR2, (USART_CR2_STOP_Msk), config.bit_endianness);
-
-    /* DMA enable - Tx/Rx disabled (default) */
-    // TBC : need to be configured after USART ENABLE ?
-    // ATOMIC_CLEAR_BIT(self->CR3, USART_CR3_DMAT);
-    // ATOMIC_CLEAR_BIT(self->CR3, USART_CR3_DMAR);
+    /*------------- USARTx CR3 Configuration -------------*/
+    /* Hardware Flow Controle - none (default) */
+    // MODIFY_REG(self->CR3, (USART_CR3_CTSE_Msk | USART_CR3_RTSE_Msk), config.flow_control);
+    
+    /*------------- USARTx BRR Configuration -------------*/
+    /* UART baudrate - 0 (default) */
+    // TODO : get USARTx periph clock_source freq
+    self->BRR = _uart_baudrateToBrrValue(SystemCoreClock, config.oversampling, config.baudrate);
 
     ringbuffer_init(&uart4_ringbuffer_rx, uart4_rx_buffer, sizeof(uart4_rx_buffer)/sizeof(uart4_rx_buffer[0]));
     ringbuffer_init(&uart4_ringbuffer_tx, uart4_tx_buffer, sizeof(uart4_tx_buffer)/sizeof(uart4_tx_buffer[0]));
+
+    // In asynchronous mode, the following bits must be kept cleared:
+    ATOMIC_CLEAR_BIT(self->CR2, (USART_CR2_LINEN | USART_CR2_CLKEN));
+    ATOMIC_CLEAR_BIT(self->CR3, (USART_CR3_SCEN | USART_CR3_HDSEL | USART_CR3_IREN));
+
+    uart_enable(self);
+
 }
 
 void uart_deinit(USART_TypeDef * self)
@@ -165,18 +293,12 @@ void uart_enable(USART_TypeDef * self)
         return;
     }
 
-    // In asynchronous mode, the following bits must be kept cleared:
-    ATOMIC_CLEAR_BIT(self->CR2, (USART_CR2_LINEN | USART_CR2_CLKEN));
-    ATOMIC_CLEAR_BIT(self->CR3, (USART_CR3_SCEN | USART_CR3_HDSEL | USART_CR3_IREN));
-
-    ATOMIC_SET_BIT(self->CR1, (USART_CR1_UE | USART_CR1_TE));
-    while (USART_ISR_TEACK != (self->ISR & USART_ISR_TEACK)){};
+    ATOMIC_SET_BIT(self->CR1, USART_CR1_UE);
+    _uart_waitReady(self);
 }
 
 void uart_disable(USART_TypeDef * self)
 {
-    int uart_irqn;
-
     if (self == NULL) {
         return;
     }
@@ -190,16 +312,9 @@ void uart_disable(USART_TypeDef * self)
     // TODO : DMA channel must be disabled before resetting the UE bit
 
     // Disable UART irq
-    switch ((unsigned long)self) {
-        case (unsigned long)USART1: uart_irqn = USART1_IRQn; break;
-        case (unsigned long)USART2: uart_irqn = USART2_IRQn; break;
-        case (unsigned long)USART3: uart_irqn = USART3_IRQn; break;
-        case (unsigned long)UART4:  uart_irqn = UART4_IRQn;  break;
-        case (unsigned long)UART5:  uart_irqn = UART5_IRQn;  break;
-        default: return;
-    }
-    NVIC_ClearPendingIRQ(uart_irqn);
-    NVIC_DisableIRQ(uart_irqn);
+    IRQn_Type irqn = _uart_getIRQn(self);
+    NVIC_ClearPendingIRQ(irqn);
+    NVIC_DisableIRQ(irqn);
 
     /* Disable UART */
     ATOMIC_CLEAR_BIT(self->CR1, USART_CR1_UE);
@@ -221,10 +336,13 @@ void uart_puts(USART_TypeDef * self, char * s)
         return;
     }
 
+    IRQn_Type irqn = _uart_getIRQn(self);
+    NVIC_DisableIRQ(irqn);
     while (*s != '\0') {
         uart_putchar(self, *s);
         s++;
     }
+    NVIC_EnableIRQ(irqn);
 }
 
 char uart_getchar(USART_TypeDef * self)
@@ -268,66 +386,21 @@ void uart_send(USART_TypeDef * self, char * buffer, uint16_t length)
         return;
     }
 
-    IRQn_Type irqn;
-    ringbuffer_t * buffPtr;
-    if (USART1 == self) {
-        #ifdef UASRT1_INT_MODE_ENABLE
-        irqn = USART1_IRQn;
-        buffPtr = &usart1_ringbuffer_tx;
-        #else
-        return;
-        #endif
-    }
-    else if (USART2 == self) {
-        #ifdef USART2_INT_MODE_ENABLE
-        irqn = USART2_IRQn;
-        buffPtr = &usart2_ringbuffer_tx;
-        #else
-        return;
-        #endif
-    }
-    else if (USART3 == self) {
-        #ifdef USART3_INT_MODE_ENABLE
-        irqn = USART3_IRQn;
-        buffPtr = &usart3_ringbuffer_tx;
-        #else
-        return;
-        #endif
-    }
-    else if (UART4 == self) {
-        #ifdef UART4_INT_MODE_ENABLE
-        irqn = UART4_IRQn;
-        buffPtr = &uart4_ringbuffer_tx;
-        #else
-        return;
-        #endif
-    }
-    else if (UART5 == self) {
-        #ifdef UART5_INT_MODE_ENABLE
-        irqn = UART5_IRQn;
-        buffPtr = &uart5_ringbuffer_tx;
-        #else
-        return;
-        #endif
-    }
-    else {
-        return;
-    }
+    // TODO : Check for ongoing transmission (and handle it if true)
 
-    NVIC_DisableIRQ(irqn);
+    IRQn_Type irqn = _uart_getIRQn(self);
+    ringbuffer_t * buffPtr = _uart_getRingbufferTx(self);
 
+    // TODO : Is it necessary to protect buffer memcpy ?
     // memcpy
+    NVIC_DisableIRQ(irqn);
     for (uint8_t i = 0; i < (length*sizeof(buffer[0])); i++) {
         ringbuffer_put(buffPtr, buffer[i]);
     }
-    
+    NVIC_EnableIRQ(irqn);
+
     // Enable TX interrupt
     ATOMIC_SET_BIT(self->CR1, USART_CR1_TXEIE);
-    
-    // Send the first byte
-    self->TDR = ringbuffer_get(buffPtr);
-
-    NVIC_EnableIRQ(irqn);
 }
 
 void uart_listen(USART_TypeDef * self)
@@ -336,45 +409,7 @@ void uart_listen(USART_TypeDef * self)
         return;
     }
 
-    IRQn_Type irqn;
-    if (USART1 == self) {
-        #ifdef UASRT1_INT_MODE_ENABLE
-        irqn = USART1_IRQn;
-        #else
-        return;
-        #endif
-    }
-    else if (USART2 == self) {
-        #ifdef USART2_INT_MODE_ENABLE
-        irqn = USART2_IRQn;
-        #else
-        return;
-        #endif
-    }
-    else if (USART3 == self) {
-        #ifdef USART3_INT_MODE_ENABLE
-        irqn = USART3_IRQn;
-        #else
-        return;
-        #endif
-    }
-    else if (UART4 == self) {
-        #ifdef UART4_INT_MODE_ENABLE
-        irqn = UART4_IRQn;
-        #else
-        return;
-        #endif
-    }
-    else if (UART5 == self) {
-        #ifdef UART5_INT_MODE_ENABLE
-        irqn = UART5_IRQn;
-        #else
-        return;
-        #endif
-    }
-    else {
-        return;
-    }
+    IRQn_Type irqn = _uart_getIRQn(self);
 
     ATOMIC_SET_BIT(self->CR3, USART_CR3_EIE);
     // Enable RX interrupt
@@ -388,45 +423,7 @@ uint8_t uart_msgReceived(USART_TypeDef * self)
         return 0;
     }
 
-    ringbuffer_t * buffPtr;
-    switch ((unsigned long)self) {
-        case (unsigned long)USART1:
-            #ifdef UASRT1_INT_MODE_ENABLE
-            buffPtr = &usart1_ringbuffer_rx;
-            break;
-            #else
-            return 0;
-            #endif
-        case (unsigned long)USART2:
-            #ifdef USART2_INT_MODE_ENABLE
-            buffPtr = &usart2_ringbuffer_rx;
-            break;
-            #else
-            return 0;
-            #endif
-        case (unsigned long)USART3:
-            #ifdef USART3_INT_MODE_ENABLE
-            buffPtr = &usart3_ringbuffer_rx;
-            break;
-            #else
-            return 0;
-            #endif
-        case (unsigned long)UART4:
-            #ifdef UART4_INT_MODE_ENABLE
-            buffPtr = &uart4_ringbuffer_rx;
-            break;
-            #else
-            return 0;
-            #endif
-        case (unsigned long)UART5:
-            #ifdef UART5_INT_MODE_ENABLE
-            buffPtr = &uart5_ringbuffer_rx;
-            break;
-            #else
-            return 0;
-            #endif
-        default: return 0;
-    }
+    ringbuffer_t * buffPtr = _uart_getRingbufferRx(self);
 
     return !ringbuffer_isEmpty(buffPtr);
 }
@@ -453,85 +450,78 @@ static void _txIsr(USART_TypeDef * self, ringbuffer_t * rb)
     }
 }
 
-#ifdef UART4_INT_MODE_ENABLE
+static void _errorIsr(USART_TypeDef * self, uint32_t cr1RegCpy, uint32_t cr3RegCpy, uint32_t isrRegCpy)
+{
+    /* UART parity error interrupt occurred */
+    if ((isrRegCpy & USART_ISR_PE) && (cr1RegCpy & USART_CR1_PEIE))
+    {
+        // TODO : error handling
+        ATOMIC_SET_BIT(self->ICR, USART_ICR_PECF);
+    }
+
+    /* UART frame error interrupt occurred */
+    if ((isrRegCpy & USART_ISR_FE) && (cr3RegCpy & USART_CR3_EIE))
+    {
+        // TODO : error handling
+        ATOMIC_SET_BIT(self->ICR, USART_ICR_FECF);
+    }
+
+    /* UART noise error interrupt occurred */
+    if ((isrRegCpy & USART_ISR_NE) && (cr3RegCpy & USART_CR3_EIE))
+    {
+        // TODO : error handling
+        ATOMIC_SET_BIT(self->ICR, USART_ICR_NECF);
+    }
+
+    /* UART Overrun interrupt occurred */
+    if ((isrRegCpy & USART_ISR_ORE) && (
+        (cr1RegCpy & USART_CR1_RXNEIE) || (cr3RegCpy & USART_CR3_EIE)))
+    {
+        // TODO : error handling
+        ATOMIC_SET_BIT(self->ICR, USART_ICR_ORECF);
+    }
+
+    /* UART Receiver Timeout interrupt occurred */
+    if ((isrRegCpy & USART_ISR_RTOF) && (cr1RegCpy & USART_CR1_RTOIE))
+    {
+        // TODO : error handling
+        ATOMIC_SET_BIT(self->ICR, USART_ICR_RTOCF);
+    }
+}
+
 void UART4_IRQHandler(void)
 {
-    uint32_t isrflags = READ_REG(UART4->ISR);
+    uint32_t isrFlags = READ_REG(UART4->ISR);
     uint32_t cr1      = READ_REG(UART4->CR1);
-    uint32_t cr3   = READ_REG(UART4->CR3);
+    uint32_t cr3      = READ_REG(UART4->CR3);
 
-    errorFlags |= (isrflags & UART_ISR_ERROR_MASK);
 
     /* UART RECEIVE INTERRUPT HANDLING */
-    if (0 == errorFlags) {
-        // RX Data Register Not Empty
-        if ((cr1 & USART_CR1_RXNEIE) && (isrflags & USART_ISR_RXNE)) {
-            _rxIsr(UART4, &uart4_ringbuffer_tx);
-            return;
-        }
+    if ((0 == (isrFlags & UART_ISR_ERROR_MASK)) && (cr1 & USART_CR1_RXNEIE) && (isrFlags & USART_ISR_RXNE)) {
+        _rxIsr(UART4, &uart4_ringbuffer_tx);
+        return;
     }
 
     /* UART ERROR INTERRUPT HANDLING */
-    if (errorFlags && (
-        (cr3 & USART_CR3_EIE) ||
-        (cr1 & (USART_CR1_RXNEIE | USART_CR1_PEIE | USART_CR1_RTOIE)))) {
-
-        /* UART parity error interrupt occurred */
-        if ((isrflags & USART_ISR_PE) && (cr1 & USART_CR1_PEIE))
-        {
-            // TODO : error handling
-            ATOMIC_SET_BIT(UART4->ICR, USART_ICR_PECF);
-        }
-
-        /* UART frame error interrupt occurred */
-        if ((isrflags & USART_ISR_FE) && (cr3 & USART_CR3_EIE))
-        {
-            // TODO : error handling
-            ATOMIC_SET_BIT(UART4->ICR, USART_ICR_FECF);
-        }
-
-        /* UART noise error interrupt occurred */
-        if ((isrflags & USART_ISR_NE) && (cr3 & USART_CR3_EIE))
-        {
-            // TODO : error handling
-            ATOMIC_SET_BIT(UART4->ICR, USART_ICR_NECF);
-        }
-
-        /* UART Overrun interrupt occurred */
-        if ((isrflags & USART_ISR_ORE) && (
-            (cr1 & USART_CR1_RXNEIE) || (cr3 & USART_CR3_EIE)))
-        {
-            // TODO : error handling
-            ATOMIC_SET_BIT(UART4->ICR, USART_ICR_ORECF);
-        }
-
-        /* UART Receiver Timeout interrupt occurred */
-        if ((isrflags & USART_ISR_RTOF) && (cr1 & USART_CR1_RTOIE))
-        {
-            // TODO : error handling
-            ATOMIC_SET_BIT(UART4->ICR, USART_ICR_RTOCF);
-        }
-
-        // Handling of RX with error
-        // RX Data Register Not Empty
-        if ((isrflags & USART_ISR_RXNE) && (cr1 & USART_CR1_RXNEIE)) {
+    if ((0 != (isrFlags & UART_ISR_ERROR_MASK)) && ((cr3 & USART_CR3_EIE) || (cr1 & (USART_CR1_RXNEIE | USART_CR1_PEIE | USART_CR1_RTOIE)))) {
+        // Handling of errors
+        _errorIsr(UART4, cr1, cr3, isrFlags);
+        // Handling of RX with error if RX Data Register Not Empty
+        if ((isrFlags & USART_ISR_RXNE) && (cr1 & USART_CR1_RXNEIE)) {
             _rxIsr(UART4, &uart4_ringbuffer_tx);
         }
-        // TODO : Handling of error, blocking (aborting xfer) vs non-blocking
         return;
     }
 
     /* UART IDLE EVENT INTERRUPT HANDLING */
-    // TODO
-    if ((cr1 & USART_CR1_IDLEIE) && (isrflags & USART_ISR_IDLE)) {
+    if ((cr1 & USART_CR1_IDLEIE) && (isrFlags & USART_ISR_IDLE)) {
         // TODO : Handling of IDLE
         ATOMIC_CLEAR_BIT(UART4->ICR, USART_ICR_IDLECF);
         return;
     }
 
     /* UART WAKEUP FROM STOP MODE INTERRUPT HANDLING */
-    // TODO
-    if ((cr3 & USART_CR3_WUFIE) && (isrflags & USART_ISR_WUF)) {
+    if ((cr3 & USART_CR3_WUFIE) && (isrFlags & USART_ISR_WUF)) {
         // TODO : Handling of WAKEUP
         ATOMIC_CLEAR_BIT(UART4->ICR, USART_ICR_IDLECF);
         return;
@@ -539,15 +529,14 @@ void UART4_IRQHandler(void)
 
     /* UART TRANSMIT INTERRUPT HANDLING */
     // TX Data Register Empty
-    if ((cr1 & USART_CR1_TXEIE) && (isrflags & USART_ISR_TXE)) {
+    if ((cr1 & USART_CR1_TXEIE) && (isrFlags & USART_ISR_TXE)) {
         _txIsr(UART4, &uart4_ringbuffer_tx);
         return;
     }
     // Transmission Complete
-    if ((cr1 & USART_CR1_TCIE) & (isrflags & USART_ISR_TC)) {
+    if ((cr1 & USART_CR1_TCIE) & (isrFlags & USART_ISR_TC)) {
         // Disable the UART Transmit Complete Interrupt
-        ATOMIC_CLEAR_BIT(UART4->CR1, USART_CR1_TCIE);
+        ATOMIC_CLEAR_BIT(UART4->CR1, (USART_CR1_TXEIE | USART_CR1_TCIE));
         // TODO : Handling of Transmit Complete
     }
 }
-#endif

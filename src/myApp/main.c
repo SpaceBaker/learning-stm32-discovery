@@ -30,16 +30,15 @@ int main(void)
     gpio_init();
 	uart_init(UART4, uart_config);
     __enable_irq();
-	uart_enable(UART4);
 
 	while (1)
 	{
 		uart_send(UART4, uart_int_msg, sizeof(uart_int_msg)-1);
-		delay_ms(1000);
-		// LED_PORT->BSRR |= GPIO_BSRR_BS14;
-        // delay_ms(500);
-		// LED_PORT->BSRR |= GPIO_BSRR_BR14;
-		// uart_puts(UART4, uart_blocking_msg);
+		delay_ms(500);
+		uart_puts(UART4, uart_blocking_msg);
+		LED_PORT->BSRR |= GPIO_BSRR_BS14;
+        delay_ms(500);
+		LED_PORT->BSRR |= GPIO_BSRR_BR14;
 	}
 }
 
@@ -47,9 +46,6 @@ int main(void)
 void SysTick_Handler(void)
 {
     sysTick_ms++;
-	if (0 == (sysTick_ms % 250)) {
-		LED_PORT->ODR ^= ODR_PIN(LED_PIN);
-	}
 }
 
 void delay_ms(uint32_t ms)

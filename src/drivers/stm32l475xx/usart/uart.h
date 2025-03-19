@@ -53,6 +53,13 @@ typedef enum {
     UART_MSB_FIRST = USART_CR2_MSBFIRST
 } uart_bit_endianness_t;
 
+typedef enum {
+    UART_RX     = USART_CR1_RE,
+    UART_TX     = USART_CR1_TE,
+    UART_TX_RX  = (USART_CR1_RE | USART_CR1_TE),
+} uart_direction_t;
+
+
 typedef struct {
     uint32_t baudrate;
     uart_word_length_t word_length;
@@ -61,6 +68,7 @@ typedef struct {
     uart_stop_bits_t stop_bits;
     uart_rx_timeout_t rx_timeout;
     uart_bit_endianness_t bit_endianness;
+    uart_direction_t direction;
 } uart_config_t;
 
 
@@ -71,7 +79,8 @@ typedef struct {
     .parity = UART_PARITY_DISABLED,\
     .stop_bits = UART_STOP_BITS_1,\
     .rx_timeout = UART_RX_TIMEOUT_DISABLED,\
-    .bit_endianness = UART_LSB_FIRST \
+    .bit_endianness = UART_LSB_FIRST, \
+    .direction = UART_TX_RX \
 }
 
 
