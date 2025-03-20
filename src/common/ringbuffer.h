@@ -20,12 +20,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+
 typedef struct ringBuffer {
-    size_t head;
-    size_t tail;
-    size_t max;
+    uint32_t head;
+    uint32_t tail;
+    uint32_t size;
     uint8_t *buffer;
-    bool full;
 } ringbuffer_t;
 
 /**
@@ -35,7 +35,7 @@ typedef struct ringBuffer {
  * @param buffer    Pointer to the actual buffer
  * @param size      Size of the buffer
  */
-void ringbuffer_init(ringbuffer_t *rb, uint8_t *buffer, size_t size);
+void ringbuffer_init(ringbuffer_t *rb, uint8_t *buffer, uint32_t size);
 
 /**
  * @brief Resets the ring buffer to empty
@@ -49,8 +49,9 @@ void ringbuffer_reset(ringbuffer_t *rb);
  * 
  * @param rb    Pointer to the ring buffer object
  * @param item  The data to add to the buffer
+ * @return uint8_t  error code : 0 is ok, else is error
  */
-void ringbuffer_put(ringbuffer_t *rb, uint8_t item);
+uint8_t ringbuffer_put(ringbuffer_t *rb, uint8_t item);
 
 /**
  * @brief Removes and returns the tail element from the ring buffer
@@ -67,14 +68,6 @@ uint8_t ringbuffer_get(ringbuffer_t *rb);
  * @return uint8_t 
  */
 uint8_t ringbuffer_peek(ringbuffer_t *rb);
-
-/**
- * @brief Returns the number of elements in the ring buffer
- * 
- * @param rb      Pointer to the ring buffer object 
- * @return size_t The number of elements
- */
-size_t ringbuffer_length(ringbuffer_t *rb);
 
 /**
  * @brief Checks if the ring buffer is empty
