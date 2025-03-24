@@ -5,14 +5,14 @@
 #include "system_stm32l4xx.h"
 #include "bsp/gpiomap.h"
 #include "usart/uart.h"
+#include "logger.h"
 
 
+/* Global variables */
 volatile uint32_t sysTick_ms = 0;
-char uart_int_msg[] = "UART4 : INTERRUPT\r\n";
-static_assert(sizeof(uart_int_msg) <= UART_BUFFER_LENGTH, "STRING IS TOO LARGE FOR UART BUFFER");
-char uart_blocking_msg[] = "UART4 : BLOCKING\r\n";
-static_assert(sizeof(uart_blocking_msg) <= UART_BUFFER_LENGTH, "STRING IS TOO LARGE FOR UART BUFFER");
-uart_config_t uart_config = UART4_CONFIG_DEFAULT;
+char logger_msg[] = "LOGGER : test\r\n";
+static_assert(sizeof(logger_msg) <= UART_BUFFER_LENGTH, "STRING IS TOO LARGE FOR UART BUFFER");
+
 
 /* Function prototypes */
 void SysTick_Handler(void);
@@ -28,14 +28,13 @@ int main(void)
 	SystemCoreClockUpdate();
     SysTick_Config(SystemCoreClock/1000);
     gpio_init();
-	uart_init(UART4, uart_config);
+	logger_init();
     __enable_irq();
 
 	while (1)
 	{
-		uart_send(UART4, uart_int_msg, sizeof(uart_int_msg)-1);
+		logger_write(logger_msg, sizeof(logger_msg)-1);
 		delay_ms(500);
-		uart_puts(UART4, uart_blocking_msg);
 		LED_PORT->BSRR |= GPIO_BSRR_BS14;
         delay_ms(500);
 		LED_PORT->BSRR |= GPIO_BSRR_BR14;
@@ -51,14 +50,14 @@ void SysTick_Handler(void)
 void delay_ms(uint32_t ms)
 {
     uint32_t delay_end = sysTick_ms + ms;
-    while (sysTick_ms < delay_end){};
+    while (sysTick_ms < delay_end);
 }
 
 void clock_system_init(void)
 {
 	/* Clock control register (RCC_CR) - reset value 0x00000063 */
 	SET_BIT(RCC->CR, RCC_CR_MSION); // Should be default after a reset
-	while (!(RCC->CR & RCC_CR_MSIRDY)){}; // Wait until MSI is stable (ready)
+	while (!(RCC->CR & RCC_CR_MSIRDY)); // Wait until MSI is stable (ready)
 	MODIFY_REG(RCC->CR, RCC_CR_MSIRANGE, RCC_CR_MSIRANGE_8); // 16MHz (6 is default 4MHz)
 	SET_BIT(RCC->CR, RCC_CR_MSIRGSEL);
 
