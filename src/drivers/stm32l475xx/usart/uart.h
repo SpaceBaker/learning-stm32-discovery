@@ -102,8 +102,8 @@ typedef struct _uart_handler_t uart_handler_t;
  * @pre rb_tx, rb_rx, dma_tx and dma_rx need to be initialzied
  * @result The UART registers are initialized according to the provided configuration and the peripheral is enabled
  * @note It is not required to enable the peripheral as this function already enables it
- */
- uart_handler_t * uart_init(USART_TypeDef * usartx, const uart_config_t config, ringbuffer_t * rb_tx, ringbuffer_t * rb_rx, dma_handler_t * dma_tx, dma_handler_t * dma_rx);
+*/
+uart_handler_t * uart_init(USART_TypeDef * usartx, const uart_config_t config, ringbuffer_t * rb_tx, ringbuffer_t * rb_rx, dma_handler_t * dma_tx, dma_handler_t * dma_rx);
 uart_error_t uart_deinit(uart_handler_t * self);
 uart_error_t uart_enable(uart_handler_t * self);
 uart_error_t uart_disable(uart_handler_t * self);
@@ -113,6 +113,7 @@ char uart_getchar(uart_handler_t * self);
 uint16_t uart_gets(uart_handler_t * self, char * buffer, uint16_t length);
 uart_error_t uart_send(uart_handler_t * self, char * buffer, uint16_t length);
 uart_error_t uart_listen(uart_handler_t * self);
+uart_error_t uart_send_dma(uart_handler_t * self, const char * buffer, const uint16_t length);
 uint8_t uart_msgReceived(uart_handler_t * self);
 
 

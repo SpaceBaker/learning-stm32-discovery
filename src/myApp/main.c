@@ -152,6 +152,7 @@ void clock_system_init(void)
 	/* AHB1 peripheral clock enable register (RCC_AHB1ENR) - reset value 0x00000000 */
 	/* AHB1 peripheral clocks enable in Sleep and Stop modes register (RCC_AHB1SMENR) - reset value 0x00011303 */
 	// Enable --DMA, TSC, CRC, Flash-- clock here
+	SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_DMA2EN);
 
 	/* AHB2 peripheral clock enable register (RCC_AHB2ENR) - reset value 0x00000000 */
 	/* AHB2 peripheral clocks enable in Sleep and Stop modes register (RCC_AHB2SMENR) - reset value 0x000532FF*/

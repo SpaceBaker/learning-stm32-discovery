@@ -4,6 +4,13 @@
 /*------------------------- Defines -------------------------------*/
 #define UART_ISR_ERROR_MASK (USART_ISR_PE | USART_ISR_FE | USART_ISR_ORE | USART_ISR_NE | USART_ISR_RTOF)
 
+/*------------------------- Static function declaration -------------------------------*/
+static void _dmaTxHalfCpltCb(dma_handler_t * dma_handler);
+static void _dmaRxHalfCpltCb(dma_handler_t * dma_handler);
+static void _dmaTxCpltCb(dma_handler_t * dma_handler);
+static void _dmaRxCpltCb(dma_handler_t * dma_handler);
+static void _dmaErrorCb(dma_handler_t * dma_handler);
+
 /*------------------------- Global private variables -------------------------------*/
 enum usart_periphId_t {
     USART1_ID = 0,
@@ -229,6 +236,12 @@ uart_handler_t * uart_init(USART_TypeDef * usartx, const uart_config_t config, r
     self->rb_rx = rb_rx;
     self->dma_tx = dma_tx;
     self->dma_rx = dma_rx;
+    if (dma_tx) {
+        self->dma_tx->parent = (void *)self;
+    }
+    if (dma_rx) {
+        self->dma_rx->parent = (void *)self;
+    }
 
     uart_enable(self);
 
@@ -378,19 +391,33 @@ uart_error_t uart_send(uart_handler_t * self, char * buffer, uint16_t length)
     return UART_OK;
 }
 
-uart_error_t uart_send_dma(uart_handler_t * self, char * buffer, uint16_t length)
+uart_error_t uart_send_dma(uart_handler_t * self, const char * buffer, const uint16_t length)
 {
+    dma_error_t dma_error = DMA_OK;
+
     if ((self == NULL) || (buffer == NULL) || (length == 0)) {
         return UART_INVALID_PARAMETER;
     }
 
-    // Check that there is no ongoing Tx process
-    // Assign Half-Transfer, Complete Transfer and error callbacks if necessary
-    // Start DMA (with interrupts)
-    // Clear UART Transfer complete flag
-    // Enable UART DMA-transfer (DMAT)
+    if (NULL == self->dma_tx) {
+        return UART_INVALID_CONFIG;
+    }
 
+    // Registering callbacks
+    self->dma_tx->xferHalfCpltCb = _dmaTxHalfCpltCb;
+    self->dma_tx->xferCpltCb     = _dmaTxCpltCb;
+    self->dma_tx->xferErrorCb    = _dmaErrorCb;
 
+    dma_error = dma_start_it(self->dma_tx, (uint32_t)buffer, (uint32_t)&self->USARTx->TDR, length, (DMA_XFER_CPLT_INT | DMA_XFER_ERROR_INT));
+    // dma_error = dma_start(self->dma_tx, (uint32_t)buffer, (uint32_t)&self->USARTx->TDR, length);
+
+    if (DMA_OK != dma_error) {
+        return UART_UNKNOWN_ERROR;
+    }
+
+    NVIC_EnableIRQ(self->irqn);
+    // ATOMIC_SET_BIT(self->USARTx->ICR, USART_ICR_TCCF);
+    ATOMIC_SET_BIT(self->USARTx->CR3, USART_CR3_DMAT);
 
     return UART_OK;
 }
@@ -482,6 +509,69 @@ static void _errorIsr(USART_TypeDef * usartx, uint32_t cr1RegCpy, uint32_t cr3Re
     }
 }
 
+static void _dmaTxHalfCpltCb(dma_handler_t * dma_handler)
+{
+    // TODO
+    (void)dma_handler;
+}
+
+__attribute__((unused)) static void _dmaRxHalfCpltCb(dma_handler_t * dma_handler)
+{
+    // TODO
+    (void)dma_handler;
+}
+
+static void _dmaTxCpltCb(dma_handler_t * dma_handler)
+{
+    uint32_t dma_ccr = dma_handler->channel->CCR;
+    uart_handler_t * uart_handler = (uart_handler_t *)dma_handler->parent;
+
+    // Not circular mode
+    if (!(dma_ccr & DMA_CCR_CIRC)) {
+        // Disable the DMA transfer for transmit request
+        ATOMIC_CLEAR_BIT(uart_handler->USARTx->CR3, USART_CR3_DMAT);
+        // Enable the UART Transmit Complete Interrupt
+        ATOMIC_SET_BIT(uart_handler->USARTx->CR1, USART_CR1_TCIE);
+    }
+    // TODO : if circular mode
+}
+
+__attribute__((unused)) static void _dmaRxCpltCb(dma_handler_t * dma_handler)
+{
+    uint32_t dma_ccr = dma_handler->channel->CCR;
+    uart_handler_t * uart_handler = (uart_handler_t *)dma_handler->parent;
+
+    // Not circular mode
+    if (!(dma_ccr & DMA_CCR_CIRC)) {
+        // Disable Frame error, noise error, overrun error, dma receiver request and idle interrupts
+        ATOMIC_CLEAR_BIT(uart_handler->USARTx->CR1, (USART_CR1_PEIE | USART_CR1_IDLEIE));
+        ATOMIC_CLEAR_BIT(uart_handler->USARTx->CR3, (USART_CR3_EIE | USART_CR3_DMAR));
+    }
+    // TODO : Reception mode is Reception Until Idle
+    // TODO : other callbacks ?
+}
+
+static void _dmaErrorCb(dma_handler_t * dma_handler)
+{
+    uart_handler_t * uart_handler = (uart_handler_t *)dma_handler->parent;
+    uint32_t usart_cr3 = uart_handler->USARTx->CR3;
+
+    // Stop UART DMA Tx request if ongoing
+    if (usart_cr3 & USART_CR3_DMAT) // && (gstate == HAL_UART_STATE_BUSY_TX))
+    {
+        ATOMIC_CLEAR_BIT(uart_handler->USARTx->CR1, (USART_CR1_TXEIE | USART_CR1_TCIE));
+    }
+
+    // Stop UART DMA Rx request if ongoing
+    if (usart_cr3 & USART_CR3_DMAR) // && (gstate == HAL_UART_STATE_BUSY_TX))
+    {
+        ATOMIC_CLEAR_BIT(uart_handler->USARTx->CR1, (USART_CR1_RXNEIE | USART_CR1_PEIE | USART_CR1_IDLEIE));
+        ATOMIC_CLEAR_BIT(uart_handler->USARTx->CR3, USART_CR3_EIE);
+    }
+
+    // TODO : other callbacks ?
+}
+
 static void _usart_IRQHandler(uart_handler_t * uart_handler)
 {
     uint32_t isrFlags = READ_REG(uart_handler->USARTx->ISR);
@@ -526,7 +616,7 @@ static void _usart_IRQHandler(uart_handler_t * uart_handler)
         return;
     }
     // Transmission Complete
-    if ((cr1 & USART_CR1_TCIE) & (isrFlags & USART_ISR_TC)) {
+    if ((cr1 & USART_CR1_TCIE) && (isrFlags & USART_ISR_TC)) {
         // Disable the UART Transmit Complete Interrupt
         ATOMIC_CLEAR_BIT(uart_handler->USARTx->CR1, (USART_CR1_TXEIE | USART_CR1_TCIE));
         // TODO : Handling of Transmit Complete
