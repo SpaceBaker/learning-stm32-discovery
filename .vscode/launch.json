@@ -12,7 +12,21 @@
             "executable": "${workspaceFolder}/build/bin/myApp.elf",
             "runToEntryPoint": "main",
             "servertype": "openocd",
-            "serverArgs": [],
+            "armToolchainPath": "/home/emile/tools/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi/bin",
+            "device": "STM32L475VGT6",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "board/stm32l4discovery.cfg"
+            ],
+            "svdFile": "${workspaceFolder}/STM32L4x5.svd"
+        },
+        {
+            "name": "(gdb) Launch",
+            "cwd": "${workspaceFolder}",
+            "type": "cortex-debug",
+            "request": "launch",
+            "executable": "${workspaceFolder}/build/bin/myApp.elf",
+            "servertype": "openocd",
             "armToolchainPath": "/home/emile/tools/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi/bin",
             "device": "STM32L475VGT6",
             "configFiles": [
@@ -20,11 +34,6 @@
                 "board/stm32l4discovery.cfg"
             ],
             "svdFile": "${workspaceFolder}/STM32L4x5.svd",
-            // "openOCDPreConfigLaunchCommands": [
-	        //     "program build/bin/myApp.elf",
-            //     "verify",
-            //     "reset"
-            // ]
         },
     ]
 }
