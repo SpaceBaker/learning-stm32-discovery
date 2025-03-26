@@ -1,4 +1,5 @@
 #include <assert.h>
+#include "usart_common.h"
 #include "uart.h"
 
 /*------------------------- Defines -------------------------------*/
@@ -48,51 +49,6 @@ static inline uart_handler_t* _uart_getHandler(USART_TypeDef * usartx)
         }
     }
     return NULL;
-}
-
-static inline bool _uart_is_busy(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_BUSY);
-}
-
-static inline bool _uart_is_idle(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_IDLE);
-}
-
-static inline bool _uart_tx_data_reg_empty(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_TXE);
-}
-
-static inline bool _uart_tx_complete(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_TC);
-}
-
-static inline bool _uart_rx_data_reg_not_empty(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_RXNE);
-}
-
-static inline bool _uart_overrun(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_ORE);
-}
-
-static inline bool _uart_noise_error(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_NE);
-}
-
-static inline bool _uart_framing_error(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_FE);
-}
-
-static inline bool _uart_parity_error(USART_TypeDef * usartx)
-{
-    return (usartx->ISR & USART_ISR_ORE);
 }
 
 static inline bool _uart_reset(USART_TypeDef * usartx)
@@ -151,19 +107,19 @@ static inline uint16_t _uart_baudrateToBrrValue(int32_t periphClk, uart_oversamp
 // TODO : timeout
 static inline void _uart_waitRXNE(USART_TypeDef * usartx)
 {
-    while (!_uart_rx_data_reg_not_empty(usartx));
+    while (!USART_RX_DATA_REG_NOT_EMPTY(usartx));
 }
 
 // TODO : timeout
 static inline void _uart_waitTXE(USART_TypeDef * usartx)
 {
-    while (!_uart_tx_data_reg_empty(usartx));
+    while (!USART_TX_DATA_REG_EMPTY(usartx));
 }
 
 // TODO : timeout
 static inline void _uart_waitTC(USART_TypeDef * usartx)
 {
-    while (!(usartx->ISR & USART_ISR_TC));
+    while (!(USART_TX_COMPLETE(usartx)));
 }
 
 // TODO : timeout
