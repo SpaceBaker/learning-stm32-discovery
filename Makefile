@@ -126,8 +126,9 @@ AS_FLAGS = $(MCU) $(AS_DEFS) $(AS_WARNS)
 LD_FLAGS = $(MCU) $(STD_LIB) -T$(LD_SCRIPT) $(LIB_DIR) $(LIBS) -Wl,-Map=$(BIN_DIR)/$(BIN_NAME).map,--cref,--gc-sections,--fix-stm32l4xx-629360
 
 #------------- Objects -------------
-C_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_SRCS))
-AS_OBJS = $(patsubst $(SRC_DIR)/%.s,$(OBJ_DIR)/%.o,$(AS_SRCS))
+C_OBJS   = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_SRCS))
+AS_OBJS  = $(patsubst $(SRC_DIR)/%.s,$(OBJ_DIR)/%.o,$(AS_SRCS))
+AS_OBJS += $(patsubst $(SRC_DIR)/%.S,$(OBJ_DIR)/%.o,$(AS_SRCS))
 
 
 #------------- PHONY calls -------------
@@ -146,8 +147,14 @@ $(BIN_DIR)/$(BIN_NAME).elf: $(AS_OBJS) $(C_OBJS)
 	@echo Size of your elf file :
 	@$(SIZE) $@
 
-# Compiling Assembly files
+# Compiling .s Assembly files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.s
+	@echo Compiling $<
+	@mkdir -p $(@D)
+	$(AS) -c $(AS_FLAGS) $< -o $@
+
+# Compiling .S Assembly files
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.S
 	@echo Compiling $<
 	@mkdir -p $(@D)
 	$(AS) -c $(AS_FLAGS) $< -o $@
