@@ -33,7 +33,8 @@ typedef enum {
 typedef enum {
     UART_PARITY_DISABLED = 0,
     UART_PARITY_EVEN     = USART_CR1_PCE,
-    UART_PARITY_ODD      = (USART_CR1_PCE | USART_CR1_PS)
+    UART_PARITY_ODD      = (USART_CR1_PCE | USART_CR1_PS),
+    UART_PARITY_Msk      = (USART_CR1_PCE | USART_CR1_PS)
 } uart_parity_t;
 
 typedef enum {
@@ -112,9 +113,10 @@ uart_error_t uart_puts(uart_handler_t * self, char * s);
 char uart_getchar(uart_handler_t * self);
 uint16_t uart_gets(uart_handler_t * self, char * buffer, uint16_t length);
 uart_error_t uart_send(uart_handler_t * self, char * buffer, uint16_t length);
-uart_error_t uart_listen(uart_handler_t * self);
 uart_error_t uart_send_dma(uart_handler_t * self, const char * buffer, const uint16_t length);
-uint8_t uart_msgReceived(uart_handler_t * self);
+uart_error_t uart_listen(uart_handler_t * self);
+uart_error_t uart_listen_dma(uart_handler_t * self, char * buffer, const uint16_t length);
+uint16_t uart_read(uart_handler_t * self, char * buffer, const uint16_t buffer_size);
 
 
 #endif /* UART_H */ 

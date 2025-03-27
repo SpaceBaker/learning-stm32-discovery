@@ -10,8 +10,6 @@
 
 /* Global variables */
 volatile uint32_t sysTick_ms = 0;
-char logger_msg[] = "LOGGER : test\r\n";
-static_assert(sizeof(logger_msg) <= UART_BUFFER_LENGTH, "STRING IS TOO LARGE FOR UART BUFFER");
 
 
 /* Function prototypes */
@@ -23,6 +21,10 @@ void gpio_init(void);
 
 int main(void)
 {
+	const uint32_t led_toggle_interval_ms = 500;
+	uint32_t led_toggle_start_ms = 0;
+	char rcvd_msg[UART_BUFFER_LENGTH];
+	uint16_t rcvd_msg_len;
     __disable_irq();
     clock_system_init();
 	SystemCoreClockUpdate();
@@ -31,13 +33,18 @@ int main(void)
 	logger_init();
     __enable_irq();
 
+	logger_listen();
+
 	while (1)
 	{
-		logger_write(logger_msg, sizeof(logger_msg)-1);
-		delay_ms(500);
-		LED_PORT->BSRR |= GPIO_BSRR_BS14;
-        delay_ms(500);
-		LED_PORT->BSRR |= GPIO_BSRR_BR14;
+		if (sysTick_ms - led_toggle_start_ms >= led_toggle_interval_ms) {
+			LED_PORT->ODR ^= (1 << LED_PIN);
+			led_toggle_start_ms = sysTick_ms;
+		}
+
+		if ((rcvd_msg_len = logger_read(rcvd_msg, sizeof(rcvd_msg)))) {
+			logger_write(rcvd_msg, rcvd_msg_len);
+		}
 	}
 }
 

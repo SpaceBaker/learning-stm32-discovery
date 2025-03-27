@@ -41,14 +41,15 @@ struct _uart_handler_t{
         void (*txISR_cb)(uart_handler_t * uart_handler);
         void (*errorISR_cb)(uart_handler_t * uart_handler);
     } callbacks;
+    volatile bool rxIdleLineDetected;
 };
 
 struct _uart_handler_t _uart_handler[UART_ID_MAX] = {
-    {USART1, USART1_IRQn, {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}},
-    {USART2, USART2_IRQn, {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}},
-    {USART3, USART3_IRQn, {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}},
-    {UART4,  UART4_IRQn,  {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}},
-    {UART5,  UART5_IRQn,  {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}}
+    {USART1, USART1_IRQn, {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}, false},
+    {USART2, USART2_IRQn, {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}, false},
+    {USART3, USART3_IRQn, {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}, false},
+    {UART4,  UART4_IRQn,  {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}, false},
+    {UART5,  UART5_IRQn,  {NULL, NULL}, {NULL, NULL}, {NULL, NULL, NULL}, false}
 };
 static_assert(UART_ID_MAX == (sizeof(_uart_handler)/sizeof(_uart_handler[0])), "Wrong array size");
 
@@ -389,7 +390,7 @@ uart_error_t uart_send_dma(uart_handler_t * self, const char * buffer, const uin
     }
 
     NVIC_EnableIRQ(self->irqn);
-    // ATOMIC_SET_BIT(self->USARTx->ICR, USART_ICR_TCCF);
+
     ATOMIC_SET_BIT(self->USARTx->CR3, USART_CR3_DMAT);
 
     return UART_OK;
@@ -401,22 +402,86 @@ uart_error_t uart_listen(uart_handler_t * self)
         return UART_INVALID_PARAMETER;
     }
 
-    // Enable error interrupt
-    ATOMIC_SET_BIT(self->USARTx->CR3, USART_CR3_EIE);
-    // Enable RX interrupt
-    ATOMIC_SET_BIT(self->USARTx->CR1, USART_CR1_RXNEIE);
     NVIC_EnableIRQ(self->irqn);
+
+    // Enable the Error Interrupt (Frame error, noise error, overrun error)
+    ATOMIC_SET_BIT(self->USARTx->CR3, USART_CR3_EIE);
+    // Enable the Parity Error Interrupt
+    if (self->USARTx->CR1 != UART_PARITY_DISABLED) {
+        ATOMIC_SET_BIT(self->USARTx->CR1, USART_CR1_PEIE);
+    }
+    // Enable the Data Register Not Empty Interrupt
+    ATOMIC_SET_BIT(self->USARTx->CR1, USART_CR1_RXNEIE);
+
+    // TEST : NEEDS TO BE IMPLEMENTED PROPERLY
+    ATOMIC_SET_BIT(self->USARTx->ICR, USART_ICR_IDLECF);
+    ATOMIC_SET_BIT(self->USARTx->CR1, USART_CR1_IDLEIE);
+    // ---------------------------------------
 
     return UART_OK;
 }
 
-uint8_t uart_msgReceived(uart_handler_t * self)
+uart_error_t uart_listen_dma(uart_handler_t * self, char * buffer, const uint16_t length)
 {
-    if ((self == NULL) || (NULL == self->ringbuffer.rx)) {
+    dma_error_t dma_error = DMA_OK;
+
+    if ((self == NULL) || (buffer == NULL) || (length == 0)) {
+        return UART_INVALID_PARAMETER;
+    }
+
+    if (NULL == self->dma.rx) {
+        return UART_INVALID_CONFIG;
+    }
+
+    // TODO : Check for already ongoing rx process
+
+    // Use default callbacks when no user callbacks have been registered 
+    if (NULL == self->dma.rx->xferHalfCpltCb) {
+        self->dma.rx->xferHalfCpltCb = _dmaRxHalfCpltCb;
+    }
+    if (NULL == self->dma.rx->xferCpltCb) {
+        self->dma.rx->xferCpltCb = _dmaRxCpltCb;
+    }
+    if (NULL == self->dma.rx->xferErrorCb) {
+        self->dma.rx->xferErrorCb = _dmaErrorCb;
+    }
+
+    dma_error = dma_start_it(self->dma.rx, (uint32_t)&self->USARTx->RDR, (uint32_t)buffer, length, (DMA_XFER_CPLT_INT | DMA_XFER_HCPLT_INT | DMA_XFER_ERROR_INT));
+
+    if (DMA_OK != dma_error) {
+        return UART_UNKNOWN_ERROR;
+    }
+
+    NVIC_EnableIRQ(self->irqn);
+
+    // Enable the Parity Error Interrupt
+    if (self->USARTx->CR1 & USART_CR1_PCE) {
+        ATOMIC_SET_BIT(self->USARTx->CR1, USART_CR1_PEIE);
+    }
+    // Enable the Error Interrupt (Frame error, noise error, overrun error)
+    // Enable the DMA transfer receiver request
+    ATOMIC_SET_BIT(self->USARTx->CR3, (USART_CR3_EIE | USART_CR3_DMAR));
+
+    return UART_OK;
+}
+
+uint16_t uart_read(uart_handler_t * self, char * buffer, const uint16_t buffer_size)
+{
+    if ((NULL == self) || (NULL == buffer) || buffer_size == 0) {
         return 0;
     }
 
-    return !ringbuffer_isEmpty(self->ringbuffer.rx);
+    uint16_t count = 0;
+
+    if (self->rxIdleLineDetected) {
+        self->rxIdleLineDetected = false;
+
+        while (!ringbuffer_isEmpty(self->ringbuffer.rx) && (count < buffer_size)) {
+            buffer[count++] = ringbuffer_get(self->ringbuffer.rx);
+        }
+    }
+
+    return count;
 }
 
 
@@ -499,7 +564,8 @@ static void _txIsr(uart_handler_t * uart_handler)
     if (ringbuffer_isEmpty(uart_handler->ringbuffer.tx)) {
         // Disable the TX interrupt
         // Enable the UART Transmit Complete Interrupt
-        ATOMIC_MODIFY_REG(uart_handler->USARTx->CR1, USART_CR1_TXEIE_Msk, USART_CR1_TCIE);
+        ATOMIC_CLEAR_BIT(uart_handler->USARTx->CR1, USART_CR1_TXEIE);
+        ATOMIC_SET_BIT(uart_handler->USARTx->CR1, USART_CR1_TCIE);
     }
     else {
         uart_handler->USARTx->TDR = ringbuffer_get(uart_handler->ringbuffer.tx);
@@ -575,14 +641,22 @@ static void _usart_IRQHandler(uart_handler_t * uart_handler)
     /* UART IDLE EVENT INTERRUPT HANDLING */
     if ((cr1 & USART_CR1_IDLEIE) && (isrFlags & USART_ISR_IDLE)) {
         // TODO : Handling of IDLE
-        ATOMIC_CLEAR_BIT(uart_handler->USARTx->ICR, USART_ICR_IDLECF);
+        ATOMIC_SET_BIT(uart_handler->USARTx->ICR, USART_ICR_IDLECF);
+
+        // TODO : DMA mode
+        // if (uart_handler->USARTx->CR3 & USART_CR3_DMAR)
+        // Not DMA mode
+        // else
+
+        uart_handler->rxIdleLineDetected = true;
+
         return;
     }
 
     /* UART WAKEUP FROM STOP MODE INTERRUPT HANDLING */
     if ((cr3 & USART_CR3_WUFIE) && (isrFlags & USART_ISR_WUF)) {
         // TODO : Handling of WAKEUP
-        ATOMIC_CLEAR_BIT(uart_handler->USARTx->ICR, USART_ICR_IDLECF);
+        ATOMIC_SET_BIT(uart_handler->USARTx->ICR, USART_ICR_IDLECF);
         return;
     }
 
