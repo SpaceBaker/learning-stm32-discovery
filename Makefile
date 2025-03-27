@@ -51,10 +51,12 @@ PROG_RUN_FLAGS 	  = verify reset exit
 # Exemple : $(wildcard $(SRC_DIR)/bsp/driver/*.c) ...
 # Exemple : $(SRC_DIR)/bsp/driver/i2c.c $(SRC_DIR)/bsp/driver/spi.c) ...
 C_SRCS =	$(SRC_DIR)/myApp/$(TARGET).c \
-			$(wildcard $(SRC_DIR)/common/ringbuffer.c) \
-			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/usart/uart.c) \
-			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/startup/system_stm32l4xx.c) \
-			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/startup/startup_stm32l475xx.c) \
+			$(SRC_DIR)/myApp/logger.c \
+			$(SRC_DIR)/common/ringbuffer.c \
+			$(SRC_DIR)/drivers/stm32l475xx/usart/uart.c \
+			$(SRC_DIR)/drivers/stm32l475xx/dma/dma.c \
+			$(SRC_DIR)/drivers/stm32l475xx/startup/system_stm32l4xx.c \
+			$(SRC_DIR)/drivers/stm32l475xx/startup/startup_stm32l475xx.c \
 
 AS_SRCS = 
 
@@ -124,44 +126,46 @@ AS_FLAGS = $(MCU) $(AS_DEFS) $(AS_WARNS)
 LD_FLAGS = $(MCU) $(STD_LIB) -T$(LD_SCRIPT) $(LIB_DIR) $(LIBS) -Wl,-Map=$(BIN_DIR)/$(BIN_NAME).map,--cref,--gc-sections,--fix-stm32l4xx-629360
 
 #------------- Objects -------------
-C_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_SRCS))
-AS_OBJS = $(patsubst $(SRC_DIR)/%.s,$(OBJ_DIR)/%.o,$(AS_SRCS))
+C_OBJS   = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_SRCS))
+AS_OBJS  = $(patsubst $(SRC_DIR)/%.s,$(OBJ_DIR)/%.o,$(AS_SRCS))
+AS_OBJS += $(patsubst $(SRC_DIR)/%.S,$(OBJ_DIR)/%.o,$(AS_SRCS))
 
+
+#------------- PHONY calls -------------
+.PHONY: all build elf lst hex srec flash cppcheck clean
 
 #------------- Rules for building the elf file -------------
-.PHONY: all build elf
-
 all: elf hex srec lst
-
 build: elf lst
-
 elf: $(BIN_DIR)/$(BIN_NAME).elf
 
+# Linking
 $(BIN_DIR)/$(BIN_NAME).elf: $(AS_OBJS) $(C_OBJS)
 	@echo Compiling $<
 	@mkdir -p $(@D)
 	$(CC) $(LD_FLAGS) -o $@ $^
 	@echo Size of your elf file :
 	@$(SIZE) $@
-# @echo Linking $<
-# @mkdir -p $(@D)
-# $(LD) $(LD_FLAGS) $^ -o $@
-# @echo Size of your elf file :
-# @$(SIZE) $@
 
+# Compiling .s Assembly files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.s
 	@echo Compiling $<
 	@mkdir -p $(@D)
 	$(AS) -c $(AS_FLAGS) $< -o $@
 
+# Compiling .S Assembly files
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.S
+	@echo Compiling $<
+	@mkdir -p $(@D)
+	$(AS) -c $(AS_FLAGS) $< -o $@
+
+# Compiling C files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo Compiling $<
 	@mkdir -p $(@D)
 	$(CC) -c $(C_FLAGS) $< -o $@
 
 #------------- Rules for building the listing file -------------
-.PHONY: lst
-
 lst: $(BIN_DIR)/$(BIN_NAME).lst
 
 $(BIN_DIR)/%.lst: $(BIN_DIR)/%.elf
@@ -169,8 +173,6 @@ $(BIN_DIR)/%.lst: $(BIN_DIR)/%.elf
 	$(OBJDUMP) -h -S $< > $@
 
 #------------- Rules for converting to hex or srec format -------------
-.PHONY: hex srec
-
 hex:  $(BIN_DIR)/$(BIN_NAME).hex
 srec: $(BIN_DIR)/$(BIN_NAME).srec
 
@@ -183,20 +185,14 @@ $(BIN_DIR)/$(BIN_NAME).srec: $(BIN_DIR)/$(BIN_NAME).elf
 	$(OBJCOPY) -O srec $< $@
 
 #------------- Rules for openocd -------------
-.PHONY: flash
-
 flash: $(BIN_DIR)/$(BIN_NAME).elf
 	$(PROG) $(PROG_CONFIG_FLAGS) -c "program $< $(PROG_RUN_FLAGS)"
 
 #------------- Rules for cppcheck -------------
-.PHONY: cppcheck
-
 cppcheck: 
 	@$(CPPCK) $(CPPCK_FLAGS) $(C_INCS) $(C_SRCS)
 
 #------------- Other Rules -------------
-.PHONY: clean
-
 clean:
 	@rm -rv $(BUILD_DIR)/*
 

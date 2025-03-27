@@ -9,15 +9,15 @@
 
 #include "stm32l4xx.h"   // IWYU pragma: export
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
+#include "uart_error.h"
+#include "dma/dma.h"
+#include "common/ringbuffer.h"
 
 
 #define UART_BUFFER_LENGTH 64
-// #define USART1_INT_MODE_ENABLE
-// #define USART2_INT_MODE_ENABLE
-// #define USART3_INT_MODE_ENABLE
-#define UART4_INT_MODE_ENABLE
-// #define UART5_INT_MODE_ENABLE
+
 
 typedef enum {
     UART_WORD_LENGTH_7 = USART_CR1_M1,
@@ -33,7 +33,8 @@ typedef enum {
 typedef enum {
     UART_PARITY_DISABLED = 0,
     UART_PARITY_EVEN     = USART_CR1_PCE,
-    UART_PARITY_ODD      = (USART_CR1_PCE | USART_CR1_PS)
+    UART_PARITY_ODD      = (USART_CR1_PCE | USART_CR1_PS),
+    UART_PARITY_Msk      = (USART_CR1_PCE | USART_CR1_PS)
 } uart_parity_t;
 
 typedef enum {
@@ -59,7 +60,6 @@ typedef enum {
     UART_TX_RX  = (USART_CR1_RE | USART_CR1_TE),
 } uart_direction_t;
 
-
 typedef struct {
     uint32_t baudrate;
     uart_word_length_t word_length;
@@ -71,8 +71,10 @@ typedef struct {
     uart_direction_t direction;
 } uart_config_t;
 
+typedef struct _uart_handler_t uart_handler_t;
 
-#define UART4_CONFIG_DEFAULT { \
+
+#define UART_CONFIG_DEFAULT { \
     .baudrate = 115200u,\
     .word_length = UART_WORD_LENGTH_8,\
     .oversampling = UART_OVERSAMPLING_16,\
@@ -86,18 +88,35 @@ typedef struct {
 
 /**
  *  Need to setup system/peripheral clock and gpio before calling this init
- */
-void uart_init(USART_TypeDef * self, uart_config_t config);
-void uart_deinit(USART_TypeDef * self);
-void uart_enable(USART_TypeDef * self);
-void uart_disable(USART_TypeDef * self);
-void uart_putchar(USART_TypeDef * self, char c);
-void uart_puts(USART_TypeDef * self, char * s);
-char uart_getchar(USART_TypeDef * self);
-uint16_t uart_gets(USART_TypeDef * self, char * buffer, uint16_t length);
-void uart_send(USART_TypeDef * self, char * buffer, uint16_t length);
-void uart_listen(USART_TypeDef * self);
-uint8_t uart_msgReceived(USART_TypeDef * self);
+*/
+
+/**
+ * @brief Initialize the uart peripheral
+ * 
+ * @param[in] self      The handler to initialize (required)
+ * @param[in] config    The configuration desired (required)
+ * @param[in] rb_tx     The TX ringbuffer (optional pass NULL if not used, otherwise required if using tx interrupt mode)
+ * @param[in] rb_rx     The RX ringbuffer (optional pass NULL if not used, otherwise required if using rx interrupt mode)
+ * @param[in] dma_tx    The DMA tx (optional pass NULL if not used, otherwise required if using DMA mode)
+ * @param[in] dma_rx    The DMA rx (optional pass NULL if not used, otherwise required if using DMA mode)
+ *
+ * @pre rb_tx, rb_rx, dma_tx and dma_rx need to be initialzied
+ * @result The UART registers are initialized according to the provided configuration and the peripheral is enabled
+ * @note It is not required to enable the peripheral as this function already enables it
+*/
+uart_handler_t * uart_init(USART_TypeDef * usartx, const uart_config_t config, ringbuffer_t * rb_tx, ringbuffer_t * rb_rx, dma_handler_t * dma_tx, dma_handler_t * dma_rx);
+uart_error_t uart_deinit(uart_handler_t * self);
+uart_error_t uart_enable(uart_handler_t * self);
+uart_error_t uart_disable(uart_handler_t * self);
+uart_error_t uart_putchar(uart_handler_t * self, char c);
+uart_error_t uart_puts(uart_handler_t * self, char * s);
+char uart_getchar(uart_handler_t * self);
+uint16_t uart_gets(uart_handler_t * self, char * buffer, uint16_t length);
+uart_error_t uart_send(uart_handler_t * self, char * buffer, uint16_t length);
+uart_error_t uart_send_dma(uart_handler_t * self, const char * buffer, const uint16_t length);
+uart_error_t uart_listen(uart_handler_t * self);
+uart_error_t uart_listen_dma(uart_handler_t * self, char * buffer, const uint16_t length);
+uint16_t uart_read(uart_handler_t * self, char * buffer, const uint16_t buffer_size);
 
 
 #endif /* UART_H */ 

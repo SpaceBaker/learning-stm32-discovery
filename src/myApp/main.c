@@ -5,14 +5,12 @@
 #include "system_stm32l4xx.h"
 #include "bsp/gpiomap.h"
 #include "usart/uart.h"
+#include "logger.h"
 
 
+/* Global variables */
 volatile uint32_t sysTick_ms = 0;
-char uart_int_msg[] = "UART4 : INTERRUPT\r\n";
-static_assert(sizeof(uart_int_msg) <= UART_BUFFER_LENGTH, "STRING IS TOO LARGE FOR UART BUFFER");
-char uart_blocking_msg[] = "UART4 : BLOCKING\r\n";
-static_assert(sizeof(uart_blocking_msg) <= UART_BUFFER_LENGTH, "STRING IS TOO LARGE FOR UART BUFFER");
-uart_config_t uart_config = UART4_CONFIG_DEFAULT;
+
 
 /* Function prototypes */
 void SysTick_Handler(void);
@@ -23,22 +21,30 @@ void gpio_init(void);
 
 int main(void)
 {
+	const uint32_t led_toggle_interval_ms = 500;
+	uint32_t led_toggle_start_ms = 0;
+	char rcvd_msg[UART_BUFFER_LENGTH];
+	uint16_t rcvd_msg_len;
     __disable_irq();
     clock_system_init();
 	SystemCoreClockUpdate();
     SysTick_Config(SystemCoreClock/1000);
     gpio_init();
-	uart_init(UART4, uart_config);
+	logger_init();
     __enable_irq();
+
+	logger_listen();
 
 	while (1)
 	{
-		uart_send(UART4, uart_int_msg, sizeof(uart_int_msg)-1);
-		delay_ms(500);
-		uart_puts(UART4, uart_blocking_msg);
-		LED_PORT->BSRR |= GPIO_BSRR_BS14;
-        delay_ms(500);
-		LED_PORT->BSRR |= GPIO_BSRR_BR14;
+		if (sysTick_ms - led_toggle_start_ms >= led_toggle_interval_ms) {
+			LED_PORT->ODR ^= (1 << LED_PIN);
+			led_toggle_start_ms = sysTick_ms;
+		}
+
+		if ((rcvd_msg_len = logger_read(rcvd_msg, sizeof(rcvd_msg)))) {
+			logger_write(rcvd_msg, rcvd_msg_len);
+		}
 	}
 }
 
@@ -51,14 +57,14 @@ void SysTick_Handler(void)
 void delay_ms(uint32_t ms)
 {
     uint32_t delay_end = sysTick_ms + ms;
-    while (sysTick_ms < delay_end){};
+    while (sysTick_ms < delay_end);
 }
 
 void clock_system_init(void)
 {
 	/* Clock control register (RCC_CR) - reset value 0x00000063 */
 	SET_BIT(RCC->CR, RCC_CR_MSION); // Should be default after a reset
-	while (!(RCC->CR & RCC_CR_MSIRDY)){}; // Wait until MSI is stable (ready)
+	while (!(RCC->CR & RCC_CR_MSIRDY)); // Wait until MSI is stable (ready)
 	MODIFY_REG(RCC->CR, RCC_CR_MSIRANGE, RCC_CR_MSIRANGE_8); // 16MHz (6 is default 4MHz)
 	SET_BIT(RCC->CR, RCC_CR_MSIRGSEL);
 
@@ -153,6 +159,7 @@ void clock_system_init(void)
 	/* AHB1 peripheral clock enable register (RCC_AHB1ENR) - reset value 0x00000000 */
 	/* AHB1 peripheral clocks enable in Sleep and Stop modes register (RCC_AHB1SMENR) - reset value 0x00011303 */
 	// Enable --DMA, TSC, CRC, Flash-- clock here
+	SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_DMA2EN);
 
 	/* AHB2 peripheral clock enable register (RCC_AHB2ENR) - reset value 0x00000000 */
 	/* AHB2 peripheral clocks enable in Sleep and Stop modes register (RCC_AHB2SMENR) - reset value 0x000532FF*/
