@@ -173,10 +173,10 @@ void clock_system_init(void)
 	/* APB1 peripheral clock enable register 1 (RCC_APB1ENR1) - reset value 0x00000000 */
 	/* APB1 peripheral clocks enable in Sleep and Stop modes register 1 (RCC_APB1SMENR1) - reset value 0xF2FECA3F */
 	// Enable --TIM, LPTIM, OPAMP, DAC, PWR, CAN, I2C, U(S)ART, SPI, WWDG-- clock here
+	SET_BIT(RCC->APB1ENR1, RCC_APB1ENR1_UART4EN);
 
 	/* APB1 peripheral clock enable register 2 (RCC_APB1ENR2) - reset value 0x00000000 */
 	/* APB1 peripheral clocks enable in Sleep and Stop modes register 2 (RCC_APB1SMENR2) - reset value 0x00000025 */
-	SET_BIT(RCC->APB1ENR1, RCC_APB1ENR1_UART4EN);
 
 	/* APB2 peripheral clock enable register (RCC_APB2ENR) - reset value 0x00000000 */
 	/* APB2 peripheral clocks enable in Sleep and Stop modes register (RCC_APB2SMENR) - reset value 0x01677C01 */
@@ -189,7 +189,7 @@ void gpio_init(void)
 {
     /* LED gpio configuration */
 	// Set GPIOB[14] as General Purpose Output
-    MODIFY_REG(LED_PORT->MODER, GPIO_MODER_MODER14, GPIO_MODER_MODER14_0);
+    MODIFY_REG(LED_PORT->MODER, GPIO_MODER_MODE14, GPIO_MODER_MODE14_0);
     // Set GPIOB[14] to push-pull
 	CLEAR_BIT(LED_PORT->OTYPER, GPIO_OTYPER_OT_14);
     // Set GPIOB[14] speed to low on
@@ -199,15 +199,15 @@ void gpio_init(void)
 
 	/* UART4 gpio configuration */
 	// Set GPIOA[1:0] alternate function to UART4 (tx and rx)
-	MODIFY_REG(UART_PORT->AFR[0], (GPIO_AFRL_AFSEL0_Msk | GPIO_AFRL_AFSEL1_Msk), 
+	MODIFY_REG(UART_PORT->AFR[0], (GPIO_AFRL_AFSEL0_Msk | GPIO_AFRL_AFSEL1_Msk),
 								  (GPIO_AFRL_AFSEL0_3 | GPIO_AFRL_AFSEL1_3));
 	// Set GPIOA pin[1:0] as alternate function
-	MODIFY_REG(UART_PORT->MODER, GPIO_MODER_MODER0 | GPIO_MODER_MODER1,
-								 GPIO_MODER_MODER0_1 | GPIO_MODER_MODER1_1);
+	MODIFY_REG(UART_PORT->MODER, GPIO_MODER_MODE0_Msk | GPIO_MODER_MODE1_Msk,
+								 GPIO_MODER_MODE0_1 | GPIO_MODER_MODE1_1);
     // Set to no-pull-up/down GPIOA[1:0]
     CLEAR_BIT(UART_PORT->PUPDR, GPIO_PUPDR_PUPD0 | GPIO_PUPDR_PUPD1);
     // Set GPIOA[1:0] to push-pull
-	CLEAR_BIT(UART_PORT->OTYPER, (GPIO_OTYPER_OT_0 | GPIO_OTYPER_OT_1));
+	CLEAR_BIT(UART_PORT->OTYPER, (GPIO_OTYPER_OT0 | GPIO_OTYPER_OT1));
     // Set GPIOA[1:0] speed to very high
-	CLEAR_BIT(UART_PORT->OSPEEDR, (GPIO_OSPEEDR_OSPEED0 | GPIO_OSPEEDR_OSPEED1));
+	SET_BIT(UART_PORT->OSPEEDR, (GPIO_OSPEEDR_OSPEED0 | GPIO_OSPEEDR_OSPEED1));
 }
