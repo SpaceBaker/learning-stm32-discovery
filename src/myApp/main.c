@@ -23,8 +23,6 @@ int main(void)
 {
 	const uint32_t led_toggle_interval_ms = 500;
 	uint32_t led_toggle_start_ms = 0;
-	char rcvd_msg[UART_BUFFER_LENGTH];
-	uint16_t rcvd_msg_len;
     __disable_irq();
     clock_system_init();
 	SystemCoreClockUpdate();
@@ -33,17 +31,11 @@ int main(void)
 	logger_init();
     __enable_irq();
 
-	logger_listen();
-
 	while (1)
 	{
 		if (sysTick_ms - led_toggle_start_ms >= led_toggle_interval_ms) {
 			LED_PORT->ODR ^= (1 << LED_PIN);
 			led_toggle_start_ms = sysTick_ms;
-		}
-
-		if ((rcvd_msg_len = logger_read(rcvd_msg, sizeof(rcvd_msg)))) {
-			logger_write(rcvd_msg, rcvd_msg_len);
 		}
 	}
 }
