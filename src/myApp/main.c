@@ -24,8 +24,7 @@ int main(void)
 	uint32_t led_toggle_start_ms = 0;
     __disable_irq();
     clock_system_init();
-	SystemCoreClockUpdate();
-    SysTick_Config(SystemCoreClock/1000);
+    SysTick_Config(getHClkFreq()/1000);
     gpio_init();
 	logger_init();
     __enable_irq();
@@ -35,6 +34,7 @@ int main(void)
 		if (sysTick_ms - led_toggle_start_ms >= led_toggle_interval_ms) {
 			LED_PORT->ODR ^= (1 << LED_PIN);
 			led_toggle_start_ms = sysTick_ms;
+			logger_write("PING\r\n", 6);
 		}
 	}
 }
@@ -51,6 +51,53 @@ void delay_ms(uint32_t ms)
     while (sysTick_ms < delay_end);
 }
 
+
+void clock_system_init(void)
+{
+	/* Set the Dynamic Voltage Regulation range according to the CPU clock (HCLK) --------- */
+	// HCLK up to 80MHz -> Range 1 (1.2V) : High performance
+	ATOMIC_MODIFY_REG(PWR->CR1, PWR_CR1_VOS_Msk, PWR_CR1_VOS_0);
+	while (PWR_SR2_VOSF == (PWR->SR2 & PWR_SR2_VOSF));	// Wait for voltage regulator to be stabilized
+	/* Set FLASH Latency according to the CPU clock (HCLK) ------------------------------- */
+	// HCLK up to 80MHz -> 4WS / 5CPU cycles
+	ATOMIC_MODIFY_REG(FLASH->ACR, FLASH_ACR_LATENCY_Msk, FLASH_ACR_LATENCY_4WS);
+	while (FLASH_ACR_LATENCY_4WS != (FLASH->ACR & FLASH_ACR_LATENCY_4WS));
+
+	/* Set system clock to pll @ 80MHz --------------------------------------------------- */
+	/* Turn off PLL, turn on HSI */
+	PLL_OFF();
+	while (RCC->CR & RCC_CR_PLLRDY);	// Wait for not ready
+	HSI_ON();
+	waitOscReady(OSC_HSI);
+	/* PLL configuration */
+	setPllClkSrc(PLL_CLKSRC_HSI);
+	setPllClkSrcDivFactor(PLL_CLKSRC_DIV_1);	// VCO = 16MHz/1
+	setPllCfg(PLL_DEV_PLL, 10, PLLP_DIV_17, PLLQ_PLLR_DIV_8, PLLQ_PLLR_DIV_2);	// pll_clk = ((VCO * PLLN) / PLLQ) ==> 80MHz = ((16MHz * 40) / 8)
+	/* Turn on PLL */
+	PLL_SYS_CLK_ENABLE();
+	PLL_ON();
+	waitOscReady(OSC_PLL);
+	/* Set system prescalers ------------------------------------------------------------- */
+	setAhbPrescaler(AHBPRE_NONE);	// For HCLK		-> HCLK  = sysClk/ahbPre
+	setApb1Prescaler(APB1PRE_NONE);	// For PCLK1	-> PCLK1 = HCLK/apb1Pre
+	setApb2Prescaler(APB2PRE_NONE);	// For PCLK2	-> PCLK2 = HCLK/apb2Pre
+	/* Set sysClk source to PLL, turn off MSI */
+	setSysClkSrc(SYSCLKSRC_PLL);
+	while ((SYSCLKSRC_PLL << RCC_CFGR_SWS_Pos) != (RCC->CFGR & (SYSCLKSRC_PLL << RCC_CFGR_SWS_Pos)));	// Wait for sysclk source changed
+	MSI_OFF();
+
+	/* Enable peripherals clocks --------------------------------------------------------- */
+	GPIOA_CLK_ENABLE();
+	GPIOB_CLK_ENABLE();
+	UART4_CLK_ENABLE();
+	DMA2_CLK_ENABLE();
+
+	/* Update freq variables ------------------------------------------------------------- */
+	updateClkFreq();
+	updatePllClkFreq();
+}
+
+#if 0
 void clock_system_init(void)
 {
 	/* Clock control register (RCC_CR) - reset value 0x00000063 */
@@ -175,6 +222,7 @@ void clock_system_init(void)
 	// SET_BIT(RCC->APB2ENR, RCC_APB2ENR_SYSCFGEN);
 	}
 }
+#endif
 
 void gpio_init(void)
 {
