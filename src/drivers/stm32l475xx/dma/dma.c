@@ -1,5 +1,5 @@
 #include "dma.h"
-#include "stm32l4xx.h"
+#include "../stm32l4xx.h"
 #include <stdint.h>
 #include <assert.h>
 

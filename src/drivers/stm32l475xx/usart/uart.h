@@ -7,12 +7,12 @@
 #define UART_H
 
 
-#include "stm32l4xx.h"   // IWYU pragma: export
+#include "../stm32l4xx.h"   // IWYU pragma: keep
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include "uart_error.h"
-#include "dma/dma.h"
+#include "../dma/dma.h"
 #include "common/ringbuffer.h"
 
 

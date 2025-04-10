@@ -1,12 +1,10 @@
 #include "logger.h"
 #include "bsp/gpiomap.h"
-#include "usart/uart.h"
-#include "dma/dma.h"
+#include "drivers/stm32l475xx/usart/uart.h"
+#include "drivers/stm32l475xx/dma/dma.h"
 
 
-ringbuffer_t uartLoggerRxRingbuffer;
 uint8_t uartLoggerTxbuffer[UART_BUFFER_LENGTH];
-uint8_t uartLoggerRxbuffer[UART_BUFFER_LENGTH];
 dma_handler_t * txDmaHandler;
 uart_handler_t * uartHandler;
 
@@ -14,6 +12,7 @@ uart_handler_t * uartHandler;
 void logger_init(void)
 {
     uart_config_t uartConfig = UART_CONFIG_DEFAULT;
+    uartConfig.direction = UART_TX;
     dma_config_t txDmaConfig = {
         .request = DMA_REQUEST_2,
         .sw_priority = DMA_SW_PRIORITY_LOW,
@@ -27,8 +26,7 @@ void logger_init(void)
     if (NULL == txDmaHandler) {
         __BKPT();
     }
-	ringbuffer_init(&uartLoggerRxRingbuffer, uartLoggerRxbuffer, (sizeof(uartLoggerRxbuffer)/sizeof(uartLoggerRxbuffer[0])));
-    uartHandler = uart_init(LOGGER_UART, uartConfig, NULL, &uartLoggerRxRingbuffer, txDmaHandler, NULL);
+    uartHandler = uart_init(LOGGER_UART, uartConfig, NULL, NULL, txDmaHandler, NULL);
     if (NULL == uartHandler) {
         __BKPT();
     }

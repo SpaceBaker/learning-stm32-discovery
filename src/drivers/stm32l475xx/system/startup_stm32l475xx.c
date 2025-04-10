@@ -23,8 +23,7 @@
  * limitations under the License.
  */
 
-#include <stm32l4xx.h>
-#include <system_stm32l4xx.h>
+#include "../stm32l4xx.h"   // IWYU pragma: keep
 
 
 /*---------------------------------------------------------------------------
@@ -268,7 +267,10 @@ void Reset_Handler(void)
   extern int main(void);
 
   /* CMSIS System Initialization */
-  SystemInit();
+  /* FPU settings ------------------------------------------------------------*/
+  #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
+  SCB->CPACR |= ((3UL << 20U)|(3UL << 22U));  /* set CP10 and CP11 Full Access */
+  #endif
 
   // Copy .data from FLASH to SRAM
   unsigned int *flash_data = &__text_end__;

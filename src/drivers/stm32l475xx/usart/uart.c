@@ -1,6 +1,7 @@
 #include <assert.h>
 #include "usart_common.h"
 #include "uart.h"
+#include "../clock/clock.h"
 
 /*------------------------- Defines -------------------------------*/
 #define UART_ISR_ERROR_MASK (USART_ISR_PE | USART_ISR_FE | USART_ISR_ORE | USART_ISR_NE | USART_ISR_RTOF)
@@ -195,7 +196,7 @@ uart_handler_t * uart_init(USART_TypeDef * usartx, const uart_config_t config, r
     /*------------- USARTx BRR Configuration -------------*/
     /* UART baudrate - 0 (default) */
     // TODO : get USARTx periph clock_source freq
-    self->USARTx->BRR = _uart_baudrateToBrrValue(SystemCoreClock, config.oversampling, config.baudrate);
+    self->USARTx->BRR = _uart_baudrateToBrrValue(getUsartClkFreq(self->USARTx), config.oversampling, config.baudrate);
 
     // In asynchronous mode, the following bits must be kept cleared:
     ATOMIC_CLEAR_BIT(self->USARTx->CR2, (USART_CR2_LINEN | USART_CR2_CLKEN));
