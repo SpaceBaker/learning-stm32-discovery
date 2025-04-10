@@ -1,10 +1,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <assert.h>
-#include "stm32l4xx.h"
-#include "system_stm32l4xx.h"
+#include "drivers/stm32l475xx/stm32l4xx.h"
+#include "drivers/stm32l475xx/clock/clock.h"
 #include "bsp/gpiomap.h"
-#include "usart/uart.h"
 #include "logger.h"
 
 

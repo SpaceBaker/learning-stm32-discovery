@@ -1,6 +1,7 @@
 #include <assert.h>
 #include "usart_common.h"
 #include "uart.h"
+#include "../clock/clock.h"
 
 /*------------------------- Defines -------------------------------*/
 #define UART_ISR_ERROR_MASK (USART_ISR_PE | USART_ISR_FE | USART_ISR_ORE | USART_ISR_NE | USART_ISR_RTOF)

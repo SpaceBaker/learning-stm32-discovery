@@ -1,7 +1,7 @@
 #include "logger.h"
 #include "bsp/gpiomap.h"
-#include "usart/uart.h"
-#include "dma/dma.h"
+#include "drivers/stm32l475xx/usart/uart.h"
+#include "drivers/stm32l475xx/dma/dma.h"
 
 
 uint8_t uartLoggerTxbuffer[UART_BUFFER_LENGTH];

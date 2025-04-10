@@ -53,10 +53,10 @@ PROG_RUN_FLAGS 	  = verify reset exit
 C_SRCS =	$(SRC_DIR)/myApp/$(TARGET).c \
 			$(SRC_DIR)/myApp/logger.c \
 			$(SRC_DIR)/common/ringbuffer.c \
+			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/clock/*.c) \
 			$(SRC_DIR)/drivers/stm32l475xx/usart/uart.c \
 			$(SRC_DIR)/drivers/stm32l475xx/dma/dma.c \
-			$(SRC_DIR)/drivers/stm32l475xx/startup/system_stm32l4xx.c \
-			$(SRC_DIR)/drivers/stm32l475xx/startup/startup_stm32l475xx.c \
+			$(SRC_DIR)/drivers/stm32l475xx/system/startup_stm32l475xx.c \
 
 AS_SRCS = 
 
@@ -65,13 +65,7 @@ AS_SRCS =
 C_INCS =	-I$(SRC_DIR) \
 			-I$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include \
 			-I$(SRC_DIR)/externals/CMSIS_6/CMSIS/Core/Include/m-profile \
-			-I$(SRC_DIR)/externals/cmsis_device_l4/Include \
-			-I$(SRC_DIR)/myApp \
-			-I$(SRC_DIR)/common \
-			-I$(SRC_DIR)/drivers \
-			-I$(SRC_DIR)/drivers/stm32l475xx \
-			-I$(SRC_DIR)/drivers/stm32l475xx/startup \
-			-I$(SRC_DIR)/drivers/stm32l475xx/clock \
+			-I$(SRC_DIR)/myApp
 
 AS_INCS =
 
@@ -103,7 +97,7 @@ C_STD = -std=gnu11
 CPPCK_FLAGS = --quiet --error-exitcode=1 --language=c --std=c11 --suppress=unusedFunction
 
 #------------- Linker Script -------------
-LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/startup/stm32l475xx.ld
+LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/system/stm32l475xx.ld
 # LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/startup/stm32l475vgtx_flash.ld
 
 
