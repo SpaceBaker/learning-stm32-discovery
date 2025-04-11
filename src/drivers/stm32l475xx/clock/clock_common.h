@@ -35,12 +35,17 @@
   #define SAI2_EXTCLK_VALUE    0U /*!< Value of the External SAI2 Clock in Hz*/
 #endif
 
+typedef enum {
+  SYSCLK_ID = 0,
+  HCLK_ID,
+  PCLK1_ID,
+  PCLK2_ID,
+  SYSCLKID_Max
+} sysClkId_t;
+
 void updateClkFreq(void);
-uint32_t getSysClkFreq(void);
-uint32_t getHClkFreq(void);
-uint32_t getPClk1Freq(void);
-uint32_t getPClk2Freq(void);
 uint32_t getMsiFreq(void);
+uint32_t getSysClkFreq(sysClkId_t sysClkId);
 
 
 #endif // __CLOCK_COMMON_H

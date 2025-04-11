@@ -1,10 +1,7 @@
 #include "clock_common.h"
 
 /*--------------------- CLOCK CURRENT FREQUENCY VARIABLES ---------------------*/
-static uint32_t sysClk = MSI_VALUE;
-static uint32_t hClk   = MSI_VALUE;
-static uint32_t pClk1  = MSI_VALUE;
-static uint32_t pClk2  = MSI_VALUE;
+static uint32_t sysClk[SYSCLKID_Max] = {MSI_VALUE, MSI_VALUE, MSI_VALUE, MSI_VALUE};
 
 static const uint8_t  AHBPrescTable[16] = {0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 1U, 2U, 3U, 4U, 6U, 7U, 8U, 9U};
 static const uint8_t  APBPrescTable[8] =  {0U, 0U, 0U, 0U, 1U, 2U, 3U, 4U};
@@ -61,13 +58,13 @@ void updateClkFreq(void) {
     /* Update SYSCLK source -------------------------------------------------------*/
     switch (RCC->CFGR & RCC_CFGR_SWS) {
         case RCC_CFGR_SWS_MSI:
-            sysClk = msiFreq;
+            sysClk[SYSCLK_ID] = msiFreq;
             break;
         case RCC_CFGR_SWS_HSI:
-            sysClk = HSI_VALUE;
+            sysClk[SYSCLK_ID] = HSI_VALUE;
             break;
         case RCC_CFGR_SWS_HSE:
-            sysClk = HSE_VALUE;
+            sysClk[SYSCLK_ID] = HSE_VALUE;
             break;
         case RCC_CFGR_SWS_PLL: {
             pllm = ((RCC->PLLCFGR & RCC_PLLCFGR_PLLM) >> RCC_PLLCFGR_PLLM_Pos) + 1U;    // Division factor
@@ -84,10 +81,10 @@ void updateClkFreq(void) {
             }
             pllvco = pllvco * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> RCC_PLLCFGR_PLLN_Pos);
             pllr = (((RCC->PLLCFGR & RCC_PLLCFGR_PLLR) >> 25U) + 1U) * 2U;
-            sysClk = pllvco / pllr;
+            sysClk[SYSCLK_ID] = pllvco / pllr;
         } break;
         default:
-            sysClk = msiFreq;
+            sysClk[SYSCLK_ID] = msiFreq;
             break;
     }
 
@@ -95,35 +92,19 @@ void updateClkFreq(void) {
     /* Get HCLK prescaler */
     tmp = AHBPrescTable[((RCC->CFGR & RCC_CFGR_HPRE) >> RCC_CFGR_HPRE_Pos)];
     /* HCLK clock frequency */
-    hClk = sysClk >> tmp;
+    sysClk[HCLK_ID] = sysClk[SYSCLK_ID] >> tmp;
 
     /* Update PCLK1 clock frequency --------------------------------------------*/
     /* Get PCLK1 prescaler */
     tmp = APBPrescTable[((RCC->CFGR & RCC_CFGR_PPRE1) >> RCC_CFGR_PPRE1_Pos)];
     /* PCLK1 clock frequency */
-    pClk1 = hClk >> tmp;
+    sysClk[PCLK1_ID] = sysClk[HCLK_ID] >> tmp;
 
     /* Update PCLK2 clock frequency --------------------------------------------*/
     /* Get PCLK2 prescaler */
     tmp = APBPrescTable[((RCC->CFGR & RCC_CFGR_PPRE2) >> RCC_CFGR_PPRE2_Pos)];
     /* PCLK2 clock frequency */
-    pClk2 = hClk >> tmp;
-}
-
-uint32_t getSysClkFreq(void) {
-    return sysClk;
-}
-
-uint32_t getHClkFreq(void) {
-    return hClk;
-}
-
-uint32_t getPClk1Freq(void) {
-    return pClk1;
-}
-
-uint32_t getPClk2Freq(void) {
-    return pClk2;
+    sysClk[PCLK2_ID] = sysClk[HCLK_ID] >> tmp;
 }
 
 uint32_t getMsiFreq(void) {
@@ -136,4 +117,12 @@ uint32_t getMsiFreq(void) {
         msiRangeSel = (RCC->CR & RCC_CR_MSIRANGE) >> RCC_CR_MSIRANGE_Pos;
     }
     return MSIRangeTable[msiRangeSel];
+}
+
+uint32_t getSysClkFreq(sysClkId_t sysClkId) {
+    if (sysClkId < SYSCLKID_Max) {
+        return sysClk[sysClkId];
+    }
+
+    return 0;
 }

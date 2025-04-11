@@ -24,7 +24,7 @@ int main(void)
 	uint32_t led_toggle_start_ms = 0;
     __disable_irq();
     clock_system_init();
-    SysTick_Config(getHClkFreq()/1000);
+    SysTick_Config(getSysClkFreq(HCLK_ID)/1000);
     gpio_init();
 	logger_init();
     __enable_irq();

@@ -209,14 +209,14 @@ uint32_t getUsartClkFreq(USART_TypeDef * usart) {
     switch (clkSrc) {
         case USARTCLKSRC_PCLK :
             if (usart == USART1) {
-                freq_hz = getPClk2Freq();
+                freq_hz = getSysClkFreq(PCLK2_ID);
             }
             else {
-                freq_hz = getPClk1Freq();
+                freq_hz = getSysClkFreq(PCLK1_ID);
             }
             break;
         case USARTCLKSRC_SYSCLK :
-            freq_hz = getSysClkFreq();
+            freq_hz = getSysClkFreq(SYSCLK_ID);
             break;
         case USARTCLKSRC_HSI :
             freq_hz = HSI_VALUE;
@@ -237,10 +237,10 @@ uint32_t getI2cClkFreq(I2C_TypeDef * i2c) {
 
     switch (clkSrc) {
         case I2CCLKSRC_PCLK :
-            freq_hz = getPClk1Freq();
+            freq_hz = getSysClkFreq(PCLK1_ID);
             break;
         case I2CCLKSRC_SYSCLK :
-            freq_hz = getSysClkFreq();
+            freq_hz = getSysClkFreq(SYSCLK_ID);
             break;
         case I2CCLKSRC_HSI :
             freq_hz = HSI_VALUE;
@@ -258,7 +258,7 @@ uint32_t getLptimClkFreq(LPTIM_TypeDef * lptim) {
 
     switch (clkSrc) {
         case LPTIMCLKSRC_PCLK :
-            freq_hz = getPClk1Freq();
+            freq_hz = getSysClkFreq(PCLK1_ID);
             break;
         case LPTIMCLKSRC_LSI :
             freq_hz = LSI_VALUE;
@@ -313,7 +313,7 @@ uint32_t getAdcClkFreq(void) {
             freq_hz = getPllClkFreq(PLL_CLKOUT_SAI2);
             break;
         case ADCCLKSRC_SYSCLK :
-            freq_hz = getSysClkFreq();
+            freq_hz = getSysClkFreq(SYSCLK_ID);
             break;
         default:
             break;
@@ -327,13 +327,13 @@ uint32_t getSwpmiClkFreq(void) {
         return HSI_VALUE;
     }
 
-    return getPClk1Freq();
+    return getSysClkFreq(PCLK1_ID);
 }
 
 uint32_t getDfsdmClkFreq(void) {
     if (true == getDfsdmClkSrc()) {
-        return getSysClkFreq();
+        return getSysClkFreq(SYSCLK_ID);
     }
 
-    return getPClk2Freq();
+    return getSysClkFreq(PCLK2_ID);
 }

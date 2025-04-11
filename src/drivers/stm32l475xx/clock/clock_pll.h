@@ -91,7 +91,7 @@ pllClkSrc_t getPllClkSrc(void);
 void setPllClkSrcDivFactor(const pllClkSrcDiv_t pllm);
 void setPllCfg(pllDev_t pllDev, const uint8_t plln, const pllPDiv_t pllp, const pllQDiv_t pllq, const pllRDiv_t pllr);
 void updatePllClkFreq(void);
-uint32_t getPllClkFreq(pllClkOut_t clk);    // Doesn't tell if output disabled (TODO ?)
+uint32_t getPllClkFreq(pllClkOut_t clk);
 
 
 #endif // __CLOCK_PLL_H
