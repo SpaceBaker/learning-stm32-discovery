@@ -84,17 +84,16 @@ typedef enum {
     AHBPRE_Msk   = RCC_CFGR_HPRE_Msk
 } ahbPrescaler_t;
 
-typedef struct {
-    osc_t           oscEnable;
-    sysClkSrc_t     sysClkSrc;
-    msiRange_t      msiRange;
-    apb1Prescaler_t apb1Pre;
-    apb2Prescaler_t apb2Pre;
-    ahbPrescaler_t  ahbPre;
-    pllConfig_t     pllConfig;
-} clockConfig_t;
+// typedef struct {
+//     osc_t           oscEnable;
+//     sysClkSrc_t     sysClkSrc;
+//     msiRange_t      msiRange;
+//     apb1Prescaler_t apb1Pre;
+//     apb2Prescaler_t apb2Pre;
+//     ahbPrescaler_t  ahbPre;
+//     pllConfig_t     pllConfig;
+// } clockConfig_t;
 
-void clockInit(const clockConfig_t * config);
 void waitOscReady(const osc_t osc);
 void setMsiRange(const msiRange_t msiRange);
 void setMsiRstRange(const msiRstRange_t msiRstRange);
