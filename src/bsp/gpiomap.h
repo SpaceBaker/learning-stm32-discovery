@@ -2,7 +2,7 @@
 #define GPIOMAP_H
 
 
-#include "stm32l4xx.h"
+#include "drivers/stm32l475xx/stm32l475xx.h"
 
 
 #define _CONCAT(x,y)    x ## y

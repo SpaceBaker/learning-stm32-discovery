@@ -2,7 +2,7 @@
 #define DMA_H
 
 
-#include "stm32l4xx.h"   // IWYU pragma: export
+#include "../stm32l4xx.h"   // IWYU pragma: keep
 #include <stdbool.h>
 #include <stddef.h>
 #include "dma_error.h"
