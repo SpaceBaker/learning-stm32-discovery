@@ -54,6 +54,7 @@ C_SRCS =	$(SRC_DIR)/myApp/$(TARGET).c \
 			$(SRC_DIR)/myApp/logger.c \
 			$(SRC_DIR)/common/ringbuffer.c \
 			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/clock/*.c) \
+			$(SRC_DIR)/drivers/stm32l475xx/gpio/gpio.c \
 			$(SRC_DIR)/drivers/stm32l475xx/usart/uart.c \
 			$(SRC_DIR)/drivers/stm32l475xx/dma/dma.c \
 			$(SRC_DIR)/drivers/stm32l475xx/system/startup_stm32l475xx.c \
