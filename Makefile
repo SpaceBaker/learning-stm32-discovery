@@ -51,13 +51,13 @@ PROG_RUN_FLAGS 	  = verify reset exit
 # Exemple : $(wildcard $(SRC_DIR)/bsp/driver/*.c) ...
 # Exemple : $(SRC_DIR)/bsp/driver/i2c.c $(SRC_DIR)/bsp/driver/spi.c) ...
 C_SRCS =	$(SRC_DIR)/myApp/$(TARGET).c \
+			$(SRC_DIR)/myApp/system/irq.c \
 			$(SRC_DIR)/myApp/logger.c \
 			$(SRC_DIR)/common/ringbuffer.c \
 			$(wildcard $(SRC_DIR)/drivers/stm32l475xx/clock/*.c) \
 			$(SRC_DIR)/drivers/stm32l475xx/gpio/gpio.c \
 			$(SRC_DIR)/drivers/stm32l475xx/usart/uart.c \
 			$(SRC_DIR)/drivers/stm32l475xx/dma/dma.c \
-			$(SRC_DIR)/drivers/stm32l475xx/system/startup_stm32l475xx.c \
 
 AS_SRCS = 
 
@@ -98,7 +98,7 @@ C_STD = -std=gnu11
 CPPCK_FLAGS = --quiet --error-exitcode=1 --language=c --std=c11 --suppress=unusedFunction
 
 #------------- Linker Script -------------
-LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/system/stm32l475xx.ld
+LD_SCRIPT = $(SRC_DIR)/myApp/system/stm32l475xx.ld
 # LD_SCRIPT = $(SRC_DIR)/drivers/stm32l475xx/startup/stm32l475vgtx_flash.ld
 
 
