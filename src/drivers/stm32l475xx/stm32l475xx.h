@@ -154,7 +154,8 @@ typedef enum
   SWPMI1_IRQn                 = 76,     /*!< Serial Wire Interface 1 global interrupt                          */
   TSC_IRQn                    = 77,     /*!< Touch Sense Controller global interrupt                           */
   RNG_IRQn                    = 80,     /*!< RNG global interrupt                                              */
-  FPU_IRQn                    = 81      /*!< FPU global interrupt                                              */
+  FPU_IRQn                    = 81,     /*!< FPU global interrupt                                              */
+  IRQn_Max
 } IRQn_Type;
 
 /**
