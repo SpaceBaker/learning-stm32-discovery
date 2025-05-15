@@ -3,10 +3,9 @@
 
 
 #include "drivers/stm32l475xx/stm32l475xx.h"
+#include "common/macro_utils.h"
 
 
-#define _CONCAT(x,y)    x ## y
-#define CONCAT(x,y)     _CONCAT(x, y)
 
 /* Serial Comm */
 #define UART_PORT (GPIOA)
