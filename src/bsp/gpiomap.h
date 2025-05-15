@@ -3,7 +3,7 @@
 
 
 #include "drivers/stm32l475xx/stm32l475xx.h"
-#include "common/macro_magic.h"
+#include "common/macro_utils.h"
 
 
 
